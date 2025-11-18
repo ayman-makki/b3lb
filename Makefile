@@ -1,7 +1,16 @@
 .PHONY: help start stop restart status logs shell db-shell redis-shell migrate makemigrations createsuperuser test clean reset build
 
-# Docker Compose file
-COMPOSE_FILE := docker-compose.local.yml
+# Docker Compose file selection based on environment
+ENV ?= local
+ifeq ($(ENV),prod)
+    COMPOSE_FILE := docker-compose.hetzner-production.yml
+else ifeq ($(ENV),production)
+    COMPOSE_FILE := docker-compose.hetzner-production.yml
+else ifeq ($(ENV),hetzner)
+    COMPOSE_FILE := docker-compose.hetzner-production.yml
+else
+    COMPOSE_FILE := docker-compose.local.yml
+endif
 COMPOSE := docker compose -f $(COMPOSE_FILE)
 
 # Service names
@@ -20,7 +29,15 @@ NC := \033[0m # No Color
 ##@ Help
 
 help: ## Display this help message
-	@echo "B3LB Local Development Makefile"
+	@echo "B3LB Development Makefile"
+	@echo ""
+	@echo "$(YELLOW)Environment Control:$(NC)"
+	@echo "  Use ENV variable to switch between local and production configurations"
+	@echo "  $(GREEN)make start$(NC)              # Local development (default)"
+	@echo "  $(GREEN)ENV=prod make start$(NC)     # Production deployment"
+	@echo "  $(GREEN)ENV=prod make logs$(NC)      # Production logs"
+	@echo ""
+	@echo "  Available environments: local, prod, production, hetzner"
 	@echo ""
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make $(GREEN)<target>$(NC)\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  $(GREEN)%-20s$(NC) %s\n", $$1, $$2 } /^##@/ { printf "\n$(YELLOW)%s$(NC)\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
@@ -290,17 +307,24 @@ health: ## Check health of all services
 	@echo ""
 
 info: ## Show environment information
-	@echo "$(GREEN)B3LB Local Development Environment$(NC)"
+	@echo "$(GREEN)B3LB Environment Information$(NC)"
 	@echo ""
+	@echo "Active Environment: $(GREEN)$(ENV)$(NC)"
 	@echo "Docker Compose file: $(COMPOSE_FILE)"
+	@echo ""
 	@echo "Services:"
 	@$(COMPOSE) config --services
 	@echo ""
-	@echo "Ports:"
-	@echo "  Frontend:   http://localhost:8000"
-	@echo "  PostgreSQL: localhost:5432"
-	@echo "  Redis:      localhost:6379"
-	@echo ""
+	@if [ "$(ENV)" = "local" ]; then \
+		echo "Exposed Ports:"; \
+		echo "  Frontend:   http://localhost:8000"; \
+		echo "  PostgreSQL: localhost:5432"; \
+		echo "  Redis:      localhost:6379"; \
+		echo ""; \
+	else \
+		echo "$(YELLOW)Production mode: Services accessed via Traefik reverse proxy$(NC)"; \
+		echo ""; \
+	fi
 	@echo "Volumes:"
 	@$(COMPOSE) config --volumes
 	@echo ""

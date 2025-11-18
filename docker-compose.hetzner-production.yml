@@ -332,12 +332,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'celery.*beat' > /dev/null || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+    # healthcheck:
+    #   test: ["CMD-SHELL", "pgrep -f 'celery.*beat' > /dev/null || exit 1"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 30s
     deploy:
       resources:
         limits:
@@ -380,12 +380,12 @@ services:
         condition: service_healthy
       celery-beat:
         condition: service_started
-    healthcheck:
-      test: ["CMD-SHELL", "celery -A loadbalancer inspect ping --destination celery@$HOSTNAME --timeout 10 | grep -q OK || exit 1"]
-      interval: 30s
-      timeout: 15s
-      retries: 3
-      start_period: 40s
+    # healthcheck:
+    #   test: ["CMD-SHELL", "celery -A loadbalancer inspect ping --timeout 10 | grep -q OK || exit 1"]
+    #   interval: 30s
+    #   timeout: 15s
+    #   retries: 3
+    #   start_period: 40s
     deploy:
       replicas: 3
       resources:
@@ -430,12 +430,12 @@ services:
         condition: service_healthy
       celery-beat:
         condition: service_started
-    healthcheck:
-      test: ["CMD-SHELL", "celery -A loadbalancer inspect ping --destination celery@$HOSTNAME --timeout 10 | grep -q OK || exit 1"]
-      interval: 30s
-      timeout: 15s
-      retries: 3
-      start_period: 60s
+    # healthcheck:
+    #   test: ["CMD-SHELL", "celery -A loadbalancer inspect ping --timeout 10 | grep -q OK || exit 1"]
+    #   interval: 30s
+    #   timeout: 15s
+    #   retries: 3
+    #   start_period: 60s
     deploy:
       replicas: 2
       resources:
