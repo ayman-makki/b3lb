@@ -388,7 +388,7 @@ services:
   # Celery Workers - Recording Rendering (PyPy, 2 replicas)
   #############################################################################
   celery-record:
-    image: quay.io/ibh/b3lb-pypy:${B3LB_VERSION:-3.3.2}
+    image: quay.io/ibh/b3lb:${B3LB_VERSION:-3.3.2}  # Using standard image instead of PyPy due to gi module issues
     restart: unless-stopped
     networks:
       - backend
@@ -403,7 +403,7 @@ services:
       - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@redis:6379/0
       - B3LB_API_BASE_DOMAIN=${B3LB_API_BASE_DOMAIN}
       - B3LB_TASK_QUEUE_RECORD=b3lb-record
-      - B3LB_RENDERING=True
+      - B3LB_RENDERING=False
       - B3LB_RECORD_STORAGE=local
       - B3LB_RECORD_LOCAL_PATH=/recordings
       # Recording rendering settings
