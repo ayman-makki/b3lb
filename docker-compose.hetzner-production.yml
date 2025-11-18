@@ -1,0 +1,559 @@
+version: '3.8'
+
+###############################################################################
+# B3LB Production Deployment for Hetzner EX44 with Traefik
+#
+# This compose file includes:
+# - Traefik reverse proxy with Let's Encrypt (Hetzner DNS)
+# - PostgreSQL 16 database
+# - Redis cache and broker
+# - B3LB frontend (3 replicas for HA)
+# - Static file server
+# - Celery workers (beat, core, recording)
+# - Prometheus monitoring
+# - Grafana dashboards
+#
+# Requirements:
+# - Domain: *.b3lb.serveur.cc pointing to server IP
+# - Hetzner DNS API token for ACME
+# - Hetzner Storage Box mounted at /mnt/b3lb-recordings
+# - 64GB RAM, 14 cores (Hetzner EX44)
+#
+# Usage:
+#   cp .env.hetzner.example .env
+#   # Edit .env with your configuration
+#   docker-compose -f docker-compose.hetzner-production.yml up -d
+###############################################################################
+
+networks:
+  traefik:
+    name: traefik
+    driver: bridge
+  backend:
+    name: backend
+    driver: bridge
+    internal: true
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  traefik_acme:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+services:
+  #############################################################################
+  # Traefik - Reverse Proxy & Load Balancer
+  #############################################################################
+  traefik:
+    image: traefik:v3.2
+    container_name: traefik
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - traefik
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - HETZNER_API_KEY=${HETZNER_DNS_API_TOKEN}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/traefik.yml:ro
+      - ./traefik/dynamic:/dynamic:ro
+      - traefik_acme:/acme
+    labels:
+      - "traefik.enable=true"
+      # Dashboard
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.b3lb.serveur.cc`)"
+      - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.traefik-dashboard.tls=true"
+      - "traefik.http.routers.traefik-dashboard.tls.certresolver=hetzner"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+      - "traefik.http.routers.traefik-dashboard.middlewares=auth"
+      # Basic auth (user: admin, password: change-me - generate with: htpasswd -nb admin password)
+      - "traefik.http.middlewares.auth.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}"
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  #############################################################################
+  # PostgreSQL - Database
+  #############################################################################
+  postgres:
+    image: postgres:16-alpine
+    container_name: b3lb-postgres
+    restart: unless-stopped
+    networks:
+      - backend
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-b3lb}
+      - POSTGRES_USER=${POSTGRES_USER:-b3lb}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
+      # Performance tuning for 64GB RAM server
+      - POSTGRES_SHARED_BUFFERS=4GB
+      - POSTGRES_EFFECTIVE_CACHE_SIZE=12GB
+      - POSTGRES_MAINTENANCE_WORK_MEM=1GB
+      - POSTGRES_CHECKPOINT_COMPLETION_TARGET=0.9
+      - POSTGRES_WAL_BUFFERS=16MB
+      - POSTGRES_DEFAULT_STATISTICS_TARGET=100
+      - POSTGRES_RANDOM_PAGE_COST=1.1
+      - POSTGRES_EFFECTIVE_IO_CONCURRENCY=200
+      - POSTGRES_WORK_MEM=64MB
+      - POSTGRES_MIN_WAL_SIZE=2GB
+      - POSTGRES_MAX_WAL_SIZE=8GB
+      - POSTGRES_MAX_WORKER_PROCESSES=14
+      - POSTGRES_MAX_PARALLEL_WORKERS_PER_GATHER=4
+      - POSTGRES_MAX_PARALLEL_WORKERS=14
+      - POSTGRES_MAX_PARALLEL_MAINTENANCE_WORKERS=4
+    command: >
+      postgres
+      -c shared_buffers=4GB
+      -c effective_cache_size=12GB
+      -c maintenance_work_mem=1GB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=64MB
+      -c min_wal_size=2GB
+      -c max_wal_size=8GB
+      -c max_worker_processes=14
+      -c max_parallel_workers_per_gather=4
+      -c max_parallel_workers=14
+      -c max_parallel_maintenance_workers=4
+      -c max_connections=200
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-b3lb} -d ${POSTGRES_DB:-b3lb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 16G
+        reservations:
+          memory: 8G
+
+  #############################################################################
+  # Redis - Cache & Message Broker
+  #############################################################################
+  redis:
+    image: redis:7-alpine
+    container_name: b3lb-redis
+    restart: unless-stopped
+    networks:
+      - backend
+    volumes:
+      - redis_data:/data
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --maxmemory 4gb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --appendonly yes
+      --appendfsync everysec
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+
+  #############################################################################
+  # B3LB Frontend - API Server (3 replicas)
+  #############################################################################
+  frontend:
+    image: quay.io/ibh/b3lb:${B3LB_VERSION:-3.3.2}
+    restart: unless-stopped
+    networks:
+      - traefik
+      - backend
+    volumes:
+      - /mnt/b3lb-recordings:/recordings
+      - ./media:/usr/src/app/media
+    environment:
+      # Core Django settings
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=False
+      - ALLOWED_HOSTS=b3lb.serveur.cc,*.b3lb.serveur.cc
+      - LANGUAGE_CODE=en-us
+      - TIME_ZONE=${TIME_ZONE:-Europe/Paris}
+
+      # Database
+      - DATABASE_URL=postgres://${POSTGRES_USER:-b3lb}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-b3lb}
+
+      # Redis - Cache (DB 1)
+      - CACHE_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
+
+      # Redis - ORM Cache (DB 2)
+      - CACHEOPS_REDIS=redis://:${REDIS_PASSWORD}@redis:6379/2
+      - CACHEOPS_DEGRADE_ON_FAILURE=True
+
+      # Celery - Broker (DB 0)
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@redis:6379/0
+
+      # B3LB Configuration
+      - B3LB_API_BASE_DOMAIN=b3lb.serveur.cc
+      - B3LB_NODE_PROTOCOL=https://
+      - B3LB_NODE_REQUEST_TIMEOUT=5
+      - WEB_CONCURRENCY=${WEB_CONCURRENCY:-5}
+
+      # Recording Configuration
+      - B3LB_RENDERING=True
+      - B3LB_RECORD_STORAGE=local
+      - B3LB_RECORD_LOCAL_PATH=/recordings
+
+      # Task Queues
+      - B3LB_TASK_QUEUE_CORE=b3lb-core
+      - B3LB_TASK_QUEUE_HOUSEKEEPING=b3lb-housekeeping
+      - B3LB_TASK_QUEUE_RECORD=b3lb-record
+      - B3LB_TASK_QUEUE_STATISTICS=b3lb-stats
+
+      # Optional: S3 fallback (if Storage Box mount fails)
+      - B3LB_S3_ACCESS_KEY=${S3_ACCESS_KEY:-}
+      - B3LB_S3_SECRET_KEY=${S3_SECRET_KEY:-}
+      - B3LB_S3_BUCKET_NAME=${S3_BUCKET_NAME:-}
+      - B3LB_S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-}
+    command: uvicorn
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      # API endpoints with wildcard
+      - "traefik.http.routers.b3lb-api.rule=HostRegexp(`{subdomain:[a-z0-9-]+}.b3lb.serveur.cc`) || Host(`b3lb.serveur.cc`)"
+      - "traefik.http.routers.b3lb-api.entrypoints=websecure"
+      - "traefik.http.routers.b3lb-api.tls=true"
+      - "traefik.http.routers.b3lb-api.tls.certresolver=hetzner"
+      - "traefik.http.routers.b3lb-api.tls.domains[0].main=b3lb.serveur.cc"
+      - "traefik.http.routers.b3lb-api.tls.domains[0].sans=*.b3lb.serveur.cc"
+      - "traefik.http.services.b3lb-api.loadbalancer.server.port=8000"
+      # Middlewares
+      - "traefik.http.routers.b3lb-api.middlewares=security-headers@file,compression@file"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/b3lb/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
+  #############################################################################
+  # B3LB Static - Static Files Server
+  #############################################################################
+  static:
+    image: quay.io/ibh/b3lb-static:${B3LB_VERSION:-3.3.2}
+    container_name: b3lb-static
+    restart: unless-stopped
+    networks:
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.b3lb-static.rule=Host(`static.b3lb.serveur.cc`)"
+      - "traefik.http.routers.b3lb-static.entrypoints=websecure"
+      - "traefik.http.routers.b3lb-static.tls=true"
+      - "traefik.http.routers.b3lb-static.tls.certresolver=hetzner"
+      - "traefik.http.services.b3lb-static.loadbalancer.server.port=80"
+      - "traefik.http.routers.b3lb-static.middlewares=compression@file"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
+  #############################################################################
+  # Celery Beat - Task Scheduler (SINGLE INSTANCE ONLY!)
+  #############################################################################
+  celery-beat:
+    image: quay.io/ibh/b3lb:${B3LB_VERSION:-3.3.2}
+    container_name: b3lb-celery-beat
+    restart: unless-stopped
+    networks:
+      - backend
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_URL=postgres://${POSTGRES_USER:-b3lb}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-b3lb}
+      - CACHE_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
+      - CACHEOPS_REDIS=redis://:${REDIS_PASSWORD}@redis:6379/2
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - B3LB_TASK_QUEUE_CORE=b3lb-core
+      - B3LB_TASK_QUEUE_HOUSEKEEPING=b3lb-housekeeping
+      - B3LB_TASK_QUEUE_RECORD=b3lb-record
+      - B3LB_TASK_QUEUE_STATISTICS=b3lb-stats
+    command: celery-beat
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -q 'celery beat' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  #############################################################################
+  # Celery Workers - Core Tasks (CPython, 3 replicas)
+  #############################################################################
+  celery-core:
+    image: quay.io/ibh/b3lb:${B3LB_VERSION:-3.3.2}
+    restart: unless-stopped
+    networks:
+      - backend
+    volumes:
+      - /mnt/b3lb-recordings:/recordings
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_URL=postgres://${POSTGRES_USER:-b3lb}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-b3lb}
+      - CACHE_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
+      - CACHEOPS_REDIS=redis://:${REDIS_PASSWORD}@redis:6379/2
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - B3LB_TASK_QUEUE_CORE=b3lb-core
+      - B3LB_TASK_QUEUE_HOUSEKEEPING=b3lb-housekeeping
+      - B3LB_TASK_QUEUE_STATISTICS=b3lb-stats
+      - B3LB_NODE_PROTOCOL=https://
+      - B3LB_NODE_REQUEST_TIMEOUT=5
+    command: celery-tasks
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      celery-beat:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A b3lb inspect ping -d celery@$HOSTNAME | grep -q OK || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
+  #############################################################################
+  # Celery Workers - Recording Rendering (PyPy, 2 replicas)
+  #############################################################################
+  celery-record:
+    image: quay.io/ibh/b3lb-pypy:${B3LB_VERSION:-3.3.2}
+    restart: unless-stopped
+    networks:
+      - backend
+    volumes:
+      - /mnt/b3lb-recordings:/recordings
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_URL=postgres://${POSTGRES_USER:-b3lb}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-b3lb}
+      - CACHE_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
+      - CACHEOPS_REDIS=redis://:${REDIS_PASSWORD}@redis:6379/2
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - B3LB_TASK_QUEUE_RECORD=b3lb-record
+      - B3LB_RENDERING=True
+      - B3LB_RECORD_STORAGE=local
+      - B3LB_RECORD_LOCAL_PATH=/recordings
+      # Recording rendering settings
+      - B3LB_RECORD_PROFILES=${B3LB_RECORD_PROFILES:-720p,1080p}
+    command: celery-tasks
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      celery-beat:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A b3lb inspect ping -d celery@$HOSTNAME | grep -q OK || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 10G
+        reservations:
+          memory: 8G
+
+  #############################################################################
+  # Prometheus - Metrics Collection
+  #############################################################################
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    networks:
+      - traefik
+      - backend
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.b3lb.serveur.cc`)"
+      - "traefik.http.routers.prometheus.entrypoints=websecure"
+      - "traefik.http.routers.prometheus.tls=true"
+      - "traefik.http.routers.prometheus.tls.certresolver=hetzner"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+      - "traefik.http.routers.prometheus.middlewares=auth"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
+  #############################################################################
+  # Grafana - Visualization & Dashboards
+  #############################################################################
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    networks:
+      - traefik
+      - backend
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      - GF_SERVER_ROOT_URL=https://grafana.b3lb.serveur.cc
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.b3lb.serveur.cc`)"
+      - "traefik.http.routers.grafana.entrypoints=websecure"
+      - "traefik.http.routers.grafana.tls=true"
+      - "traefik.http.routers.grafana.tls.certresolver=hetzner"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+
+  #############################################################################
+  # PostgreSQL Exporter - Database Metrics (Optional)
+  #############################################################################
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: postgres-exporter
+    restart: unless-stopped
+    networks:
+      - backend
+    environment:
+      - DATA_SOURCE_NAME=postgresql://${POSTGRES_USER:-b3lb}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-b3lb}?sslmode=disable
+    depends_on:
+      - postgres
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9187/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
+  #############################################################################
+  # Redis Exporter - Redis Metrics (Optional)
+  #############################################################################
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: redis-exporter
+    restart: unless-stopped
+    networks:
+      - backend
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9121/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M

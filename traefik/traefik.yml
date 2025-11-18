@@ -1,0 +1,149 @@
+###############################################################################
+# Traefik v3 Static Configuration for B3LB Production
+#
+# This is the main Traefik configuration file loaded at startup.
+# Dynamic configuration is loaded from ./dynamic/ directory.
+###############################################################################
+
+###############################################################################
+# Global Configuration
+###############################################################################
+global:
+  checkNewVersion: true
+  sendAnonymousUsage: false
+
+###############################################################################
+# API and Dashboard
+###############################################################################
+api:
+  dashboard: true
+  insecure: false
+
+###############################################################################
+# Ping (Healthcheck Endpoint)
+###############################################################################
+ping:
+  entryPoint: "traefik"
+
+###############################################################################
+# Entry Points (HTTP and HTTPS)
+###############################################################################
+entryPoints:
+  # HTTP Entry Point (port 80) - Redirects to HTTPS
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+
+  # HTTPS Entry Point (port 443)
+  websecure:
+    address: ":443"
+    http:
+      tls:
+        certResolver: hetzner
+        domains:
+          - main: "b3lb.serveur.cc"
+            sans:
+              - "*.b3lb.serveur.cc"
+      middlewares:
+        - security-headers@file
+        - compression@file
+
+  # Traefik Dashboard Entry Point (internal)
+  traefik:
+    address: ":8080"
+
+###############################################################################
+# Certificate Resolvers (Let's Encrypt with Hetzner DNS)
+###############################################################################
+certificatesResolvers:
+  hetzner:
+    acme:
+      # Email for Let's Encrypt notifications
+      email: "admin@b3lb.serveur.cc"
+
+      # ACME certificate storage
+      storage: "/acme/acme.json"
+
+      # Use Let's Encrypt production server
+      # For testing, use: https://acme-staging-v02.api.letsencrypt.org/directory
+      caServer: "https://acme-v02.api.letsencrypt.org/directory"
+
+      # DNS-01 Challenge with Hetzner DNS provider
+      dnsChallenge:
+        provider: hetzner
+        delayBeforeCheck: 30
+        resolvers:
+          - "1.1.1.1:53"
+          - "8.8.8.8:53"
+
+###############################################################################
+# Providers
+###############################################################################
+providers:
+  # Docker provider - Auto-discover services from Docker labels
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: "traefik"
+    watch: true
+
+  # File provider - Load dynamic configuration from files
+  file:
+    directory: "/dynamic"
+    watch: true
+
+###############################################################################
+# Logging
+###############################################################################
+log:
+  level: INFO
+  format: json
+  filePath: "/var/log/traefik/traefik.log"
+
+# Access logs
+accessLog:
+  format: json
+  filePath: "/var/log/traefik/access.log"
+  bufferingSize: 100
+  filters:
+    statusCodes:
+      - "400-599"  # Only log errors
+    retryAttempts: true
+    minDuration: "100ms"
+
+###############################################################################
+# Metrics (Prometheus)
+###############################################################################
+metrics:
+  prometheus:
+    entryPoint: traefik
+    addEntryPointsLabels: true
+    addRoutersLabels: true
+    addServicesLabels: true
+    buckets:
+      - 0.1
+      - 0.3
+      - 1.0
+      - 2.5
+      - 5.0
+      - 10.0
+
+###############################################################################
+# Tracing (Optional - Uncomment if you want distributed tracing)
+###############################################################################
+# tracing:
+#   jaeger:
+#     samplingType: const
+#     samplingParam: 1.0
+#     localAgentHostPort: "jaeger:6831"
+
+###############################################################################
+# Experimental Features
+###############################################################################
+experimental:
+  plugins: {}

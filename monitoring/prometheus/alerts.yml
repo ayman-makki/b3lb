@@ -1,0 +1,283 @@
+# Prometheus Alert Rules for B3LB
+#
+# Alert severity levels:
+# - critical: Immediate action required
+# - warning: Should be investigated soon
+# - info: Informational, no action needed
+
+groups:
+  ##############################################################################
+  # B3LB Application Alerts
+  ##############################################################################
+  - name: b3lb_application
+    interval: 30s
+    rules:
+      - alert: B3LBServiceDown
+        expr: up{job="b3lb-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: b3lb
+        annotations:
+          summary: "B3LB API service is down"
+          description: "B3LB API ({{ $labels.instance }}) has been down for more than 2 minutes."
+
+      - alert: B3LBHighErrorRate
+        expr: rate(http_requests_total{job="b3lb-api",status=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: b3lb
+        annotations:
+          summary: "High error rate in B3LB"
+          description: "B3LB is experiencing {{ $value | humanizePercentage }} error rate."
+
+      - alert: B3LBHighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="b3lb-api"}[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: b3lb
+        annotations:
+          summary: "B3LB slow response times"
+          description: "95th percentile response time is {{ $value }}s (threshold: 2s)."
+
+  ##############################################################################
+  # Database Alerts (PostgreSQL)
+  ##############################################################################
+  - name: postgresql
+    interval: 30s
+    rules:
+      - alert: PostgreSQLDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL database has been down for more than 1 minute."
+
+      - alert: PostgreSQLTooManyConnections
+        expr: sum(pg_stat_activity_count) > 180
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "PostgreSQL too many connections"
+          description: "PostgreSQL has {{ $value }} connections (max: 200)."
+
+      - alert: PostgreSQLHighConnectionUsage
+        expr: sum(pg_stat_activity_count) / pg_settings_max_connections * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "PostgreSQL high connection usage"
+          description: "PostgreSQL connection usage is {{ $value | humanizePercentage }}."
+
+      - alert: PostgreSQLSlowQueries
+        expr: rate(pg_stat_activity_max_tx_duration{datname="b3lb"}[5m]) > 60
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "PostgreSQL slow queries detected"
+          description: "Slow queries detected in database {{ $labels.datname }}."
+
+      - alert: PostgreSQLDeadlocks
+        expr: rate(pg_stat_database_deadlocks{datname="b3lb"}[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "PostgreSQL deadlocks detected"
+          description: "Database deadlocks detected in {{ $labels.datname }}."
+
+  ##############################################################################
+  # Redis Alerts
+  ##############################################################################
+  - name: redis
+    interval: 30s
+    rules:
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: cache
+        annotations:
+          summary: "Redis is down"
+          description: "Redis has been down for more than 1 minute."
+
+      - alert: RedisHighMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "Redis high memory usage"
+          description: "Redis memory usage is {{ $value | humanizePercentage }}."
+
+      - alert: RedisHighEvictionRate
+        expr: rate(redis_evicted_keys_total[5m]) > 100
+        for: 5m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "Redis high eviction rate"
+          description: "Redis is evicting {{ $value }} keys per second."
+
+      - alert: RedisHighRejectionRate
+        expr: rate(redis_rejected_connections_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "Redis rejecting connections"
+          description: "Redis is rejecting connections (rate: {{ $value }}/s)."
+
+  ##############################################################################
+  # Traefik Alerts
+  ##############################################################################
+  - name: traefik
+    interval: 30s
+    rules:
+      - alert: TraefikDown
+        expr: up{job="traefik"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: proxy
+        annotations:
+          summary: "Traefik is down"
+          description: "Traefik reverse proxy has been down for more than 1 minute."
+
+      - alert: TraefikHighErrorRate
+        expr: sum(rate(traefik_service_requests_total{code=~"5.."}[5m])) / sum(rate(traefik_service_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: proxy
+        annotations:
+          summary: "Traefik high error rate"
+          description: "Traefik error rate is {{ $value | humanizePercentage }}."
+
+      - alert: TraefikCertificateExpiringSoon
+        expr: traefik_tls_certs_not_after - time() < 604800
+        for: 1h
+        labels:
+          severity: warning
+          component: proxy
+        annotations:
+          summary: "TLS certificate expiring soon"
+          description: "Certificate for {{ $labels.cn }} expires in less than 7 days."
+
+      - alert: TraefikBackendDown
+        expr: traefik_backend_server_up == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: proxy
+        annotations:
+          summary: "Traefik backend down"
+          description: "Backend {{ $labels.backend }} is down."
+
+  ##############################################################################
+  # System Resource Alerts
+  ##############################################################################
+  - name: system_resources
+    interval: 30s
+    rules:
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}."
+
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}."
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 15
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "Disk space low"
+          description: "Disk space is {{ $value | humanizePercentage }} full on {{ $labels.instance }}."
+
+      - alert: DiskSpaceCritical
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 10
+        for: 2m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "Disk space critical"
+          description: "Disk space is {{ $value | humanizePercentage }} full on {{ $labels.instance }}."
+
+  ##############################################################################
+  # Container Health Alerts
+  ##############################################################################
+  - name: container_health
+    interval: 30s
+    rules:
+      - alert: ContainerDown
+        expr: time() - container_last_seen > 60
+        for: 2m
+        labels:
+          severity: warning
+          component: container
+        annotations:
+          summary: "Container down"
+          description: "Container {{ $labels.name }} has been down for more than 2 minutes."
+
+      - alert: ContainerHighCPU
+        expr: rate(container_cpu_usage_seconds_total[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: container
+        annotations:
+          summary: "Container high CPU usage"
+          description: "Container {{ $labels.name }} CPU usage is {{ $value }}%."
+
+      - alert: ContainerHighMemory
+        expr: container_memory_usage_bytes / container_spec_memory_limit_bytes * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          component: container
+        annotations:
+          summary: "Container high memory usage"
+          description: "Container {{ $labels.name }} memory usage is {{ $value | humanizePercentage }}."
+
+      - alert: ContainerRestarting
+        expr: rate(kube_pod_container_status_restarts_total[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          component: container
+        annotations:
+          summary: "Container restarting"
+          description: "Container {{ $labels.container }} in pod {{ $labels.pod }} is restarting."

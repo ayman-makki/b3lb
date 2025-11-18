@@ -1,0 +1,82 @@
+###############################################################################
+# Traefik Dynamic TLS Configuration
+#
+# This file defines TLS options including minimum version, cipher suites,
+# and curve preferences for secure HTTPS connections.
+###############################################################################
+
+tls:
+  ###########################################################################
+  # TLS Options
+  ###########################################################################
+  options:
+    # Default TLS Options (applied to all routes)
+    default:
+      minVersion: VersionTLS12  # Minimum TLS 1.2 (consider TLS 1.3 only for maximum security)
+      maxVersion: VersionTLS13  # Maximum TLS 1.3
+
+      # Cipher suites for TLS 1.2 (TLS 1.3 ciphers are automatically handled)
+      # Ordered by preference (most secure first)
+      cipherSuites:
+        # TLS 1.3 cipher suites (automatically used when available)
+        # - TLS_AES_128_GCM_SHA256
+        # - TLS_AES_256_GCM_SHA384
+        # - TLS_CHACHA20_POLY1305_SHA256
+
+        # TLS 1.2 cipher suites (for backward compatibility)
+        - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
+        - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+
+      # Elliptic curve preferences
+      curvePreferences:
+        - CurveP521
+        - CurveP384
+        - CurveP256
+
+      # Prefer server cipher suites
+      sniStrict: true
+
+      # ALPN protocols
+      alpnProtocols:
+        - h2      # HTTP/2
+        - http/1.1
+
+    # Strict TLS Options (TLS 1.3 only - for maximum security)
+    strict:
+      minVersion: VersionTLS13
+      maxVersion: VersionTLS13
+      sniStrict: true
+      alpnProtocols:
+        - h2
+        - http/1.1
+
+    # Legacy TLS Options (TLS 1.1+ - for old clients, NOT RECOMMENDED)
+    # legacy:
+    #   minVersion: VersionTLS11
+    #   maxVersion: VersionTLS13
+    #   sniStrict: false
+    #   alpnProtocols:
+    #     - h2
+    #     - http/1.1
+
+  ###########################################################################
+  # Certificate Stores (optional - for custom certificates)
+  ###########################################################################
+  # stores:
+  #   default:
+  #     defaultCertificate:
+  #       certFile: /certs/default.crt
+  #       keyFile: /certs/default.key
+
+  ###########################################################################
+  # Certificates (manual certificate configuration - optional)
+  ###########################################################################
+  # certificates:
+  #   - certFile: /certs/b3lb.serveur.cc.crt
+  #     keyFile: /certs/b3lb.serveur.cc.key
+  #     stores:
+  #       - default

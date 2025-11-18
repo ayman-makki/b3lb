@@ -1,0 +1,176 @@
+###############################################################################
+# Traefik Dynamic Middlewares Configuration
+#
+# This file defines reusable middlewares for security, compression, etc.
+# Referenced in Docker labels or other dynamic configuration files.
+###############################################################################
+
+http:
+  middlewares:
+    ###########################################################################
+    # Security Headers Middleware
+    ###########################################################################
+    security-headers:
+      headers:
+        # Browser security headers
+        browserXssFilter: true
+        contentTypeNosniff: true
+        forceSTSHeader: true
+        frameDeny: true
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 31536000  # 1 year
+
+        # Custom security headers
+        customFrameOptionsValue: "SAMEORIGIN"
+        customResponseHeaders:
+          X-Robots-Tag: "none"
+          Server: ""  # Hide server version
+
+        # Content Security Policy (adjust as needed for your requirements)
+        contentSecurityPolicy: >-
+          default-src 'self';
+          script-src 'self' 'unsafe-inline' 'unsafe-eval';
+          style-src 'self' 'unsafe-inline';
+          img-src 'self' data: https:;
+          font-src 'self' data:;
+          connect-src 'self';
+          frame-ancestors 'self';
+          base-uri 'self';
+          form-action 'self';
+
+        # Referrer Policy
+        referrerPolicy: "strict-origin-when-cross-origin"
+
+        # Permissions Policy (formerly Feature Policy)
+        permissionsPolicy: >-
+          geolocation=(),
+          midi=(),
+          camera=(),
+          usb=(),
+          magnetometer=(),
+          accelerometer=(),
+          gyroscope=(),
+          microphone=()
+
+    ###########################################################################
+    # Compression Middleware
+    ###########################################################################
+    compression:
+      compress:
+        excludedContentTypes:
+          - "text/event-stream"
+          - "application/grpc"
+        minResponseBodyBytes: 1024  # Only compress responses >= 1KB
+
+    ###########################################################################
+    # Rate Limiting Middleware (Optional - currently disabled)
+    ###########################################################################
+    # rate-limit:
+    #   rateLimit:
+    #     average: 100        # Average requests per second
+    #     period: 1s
+    #     burst: 200          # Burst size
+    #     sourceCriterion:
+    #       requestHost: true
+
+    ###########################################################################
+    # IP Whitelist Middleware (Optional - for admin endpoints)
+    ###########################################################################
+    # admin-whitelist:
+    #   ipWhiteList:
+    #     sourceRange:
+    #       - "127.0.0.1/32"      # Localhost
+    #       - "10.0.0.0/8"        # Private network
+    #       - "172.16.0.0/12"     # Private network
+    #       - "192.168.0.0/16"    # Private network
+    #       # Add your office/home IP:
+    #       # - "1.2.3.4/32"
+
+    ###########################################################################
+    # Redirect to HTTPS Middleware (applied at entry point level)
+    ###########################################################################
+    redirect-to-https:
+      redirectScheme:
+        scheme: https
+        permanent: true
+
+    ###########################################################################
+    # Remove WWW Prefix Middleware (if needed)
+    ###########################################################################
+    # remove-www:
+    #   redirectRegex:
+    #     regex: "^https?://www\\.(.+)"
+    #     replacement: "https://${1}"
+    #     permanent: true
+
+    ###########################################################################
+    # CORS Middleware (if you need cross-origin requests)
+    ###########################################################################
+    # cors:
+    #   headers:
+    #     accessControlAllowMethods:
+    #       - "GET"
+    #       - "POST"
+    #       - "PUT"
+    #       - "DELETE"
+    #       - "OPTIONS"
+    #     accessControlAllowOriginList:
+    #       - "https://example.com"
+    #     accessControlAllowHeaders:
+    #       - "Content-Type"
+    #       - "Authorization"
+    #     accessControlExposeHeaders:
+    #       - "Content-Length"
+    #       - "Content-Type"
+    #     accessControlAllowCredentials: true
+    #     accessControlMaxAge: 3600
+    #     addVaryHeader: true
+
+    ###########################################################################
+    # Error Pages Middleware (custom error pages)
+    ###########################################################################
+    # error-pages:
+    #   errors:
+    #     status:
+    #       - "500-599"
+    #     service: error-page-service
+    #     query: "/errors/{status}.html"
+
+    ###########################################################################
+    # Request Buffering (for large uploads)
+    ###########################################################################
+    # buffering:
+    #   buffering:
+    #     maxRequestBodyBytes: 104857600  # 100MB
+    #     memRequestBodyBytes: 2097152    # 2MB
+    #     maxResponseBodyBytes: 104857600 # 100MB
+    #     memResponseBodyBytes: 2097152   # 2MB
+    #     retryExpression: "IsNetworkError() && Attempts() < 3"
+
+    ###########################################################################
+    # Retry Middleware (automatic retries on failures)
+    ###########################################################################
+    retry:
+      retry:
+        attempts: 3
+        initialInterval: 100ms
+
+    ###########################################################################
+    # Circuit Breaker (protect backend services)
+    ###########################################################################
+    # circuit-breaker:
+    #   circuitBreaker:
+    #     expression: "NetworkErrorRatio() > 0.30 || ResponseCodeRatio(500, 600, 0, 600) > 0.25"
+    #     checkPeriod: 10s
+    #     fallbackDuration: 30s
+    #     recoveryDuration: 10s
+
+    ###########################################################################
+    # In-Flight Requests Limit
+    ###########################################################################
+    # in-flight-limit:
+    #   inFlightReq:
+    #     amount: 100  # Max concurrent requests per source IP
+    #     sourceCriterion:
+    #       requestHost: true

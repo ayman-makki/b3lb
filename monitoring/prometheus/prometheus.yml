@@ -1,0 +1,126 @@
+# Prometheus Configuration for B3LB Monitoring
+#
+# This configuration sets up scraping for all B3LB components:
+# - B3LB API metrics
+# - Traefik metrics
+# - PostgreSQL metrics
+# - Redis metrics
+# - Docker container metrics
+# - System metrics
+
+global:
+  scrape_interval: 30s
+  scrape_timeout: 10s
+  evaluation_interval: 30s
+  external_labels:
+    cluster: 'b3lb-production'
+    environment: 'production'
+    server: 'hetzner-ex44'
+
+# Load alert rules
+rule_files:
+  - '/etc/prometheus/alerts.yml'
+
+# Scrape configurations
+scrape_configs:
+  ##############################################################################
+  # Prometheus Self-Monitoring
+  ##############################################################################
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+  ##############################################################################
+  # Traefik Metrics
+  ##############################################################################
+  - job_name: 'traefik'
+    static_configs:
+      - targets: ['traefik:8080']
+        labels:
+          service: 'traefik'
+    metrics_path: '/metrics'
+
+  ##############################################################################
+  # B3LB API Metrics (Django/Uvicorn)
+  ##############################################################################
+  - job_name: 'b3lb-api'
+    dns_sd_configs:
+      - names:
+          - 'frontend'
+        type: 'A'
+        port: 8000
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: frontend:8000
+    metrics_path: '/b3lb/metrics'
+    scheme: 'http'
+
+  ##############################################################################
+  # PostgreSQL Exporter
+  ##############################################################################
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+        labels:
+          service: 'postgresql'
+          database: 'b3lb'
+
+  ##############################################################################
+  # Redis Exporter
+  ##############################################################################
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+        labels:
+          service: 'redis'
+
+  ##############################################################################
+  # Node Exporter (if installed on host)
+  ##############################################################################
+  # Uncomment if you install node_exporter on the host for system metrics
+  # - job_name: 'node'
+  #   static_configs:
+  #     - targets: ['host.docker.internal:9100']
+  #       labels:
+  #         service: 'node-exporter'
+  #         instance: 'hetzner-ex44'
+
+  ##############################################################################
+  # cAdvisor (Container metrics - if installed)
+  ##############################################################################
+  # - job_name: 'cadvisor'
+  #   static_configs:
+  #     - targets: ['cadvisor:8080']
+  #       labels:
+  #         service: 'cadvisor'
+
+  ##############################################################################
+  # Blackbox Exporter (External probing - optional)
+  ##############################################################################
+  # - job_name: 'blackbox'
+  #   metrics_path: /probe
+  #   params:
+  #     module: [http_2xx]
+  #   static_configs:
+  #     - targets:
+  #         - https://b3lb.serveur.cc/b3lb/ping
+  #         - https://traefik.b3lb.serveur.cc
+  #   relabel_configs:
+  #     - source_labels: [__address__]
+  #       target_label: __param_target
+  #     - source_labels: [__param_target]
+  #       target_label: instance
+  #     - target_label: __address__
+  #       replacement: blackbox-exporter:9115
+
+# Alertmanager configuration (optional - for alert routing)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ['alertmanager:9093']
