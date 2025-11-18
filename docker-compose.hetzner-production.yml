@@ -1,5 +1,3 @@
-version: '3.8'
-
 ###############################################################################
 # B3LB Production Deployment for Hetzner EX44 with Traefik
 #
@@ -185,7 +183,10 @@ services:
   # B3LB Frontend - API Server (3 replicas)
   #############################################################################
   frontend:
-    image: quay.io/ibh/b3lb:${B3LB_VERSION:-3.3.2}
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: b3lb:${B3LB_VERSION:-latest}
     restart: unless-stopped
     networks:
       - traefik
@@ -273,7 +274,10 @@ services:
   # B3LB Static - Static Files Server
   #############################################################################
   static:
-    image: quay.io/ibh/b3lb-static:${B3LB_VERSION:-3.3.2}
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.static
+    image: b3lb-static:${B3LB_VERSION:-latest}
     container_name: b3lb-static
     restart: unless-stopped
     networks:
@@ -302,7 +306,10 @@ services:
   # Celery Beat - Task Scheduler (SINGLE INSTANCE ONLY!)
   #############################################################################
   celery-beat:
-    image: quay.io/ibh/b3lb:${B3LB_VERSION:-3.3.2}
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: b3lb:${B3LB_VERSION:-latest}
     container_name: b3lb-celery-beat
     restart: unless-stopped
     networks:
@@ -342,7 +349,10 @@ services:
   # Celery Workers - Core Tasks (CPython, 3 replicas)
   #############################################################################
   celery-core:
-    image: quay.io/ibh/b3lb:${B3LB_VERSION:-3.3.2}
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: b3lb:${B3LB_VERSION:-latest}
     restart: unless-stopped
     networks:
       - backend
@@ -371,7 +381,7 @@ services:
       celery-beat:
         condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "celery -A b3lb inspect ping --destination celery@$HOSTNAME --timeout 10 | grep -q OK || exit 1"]
+      test: ["CMD-SHELL", "celery -A loadbalancer inspect ping --destination celery@$HOSTNAME --timeout 10 | grep -q OK || exit 1"]
       interval: 30s
       timeout: 15s
       retries: 3
@@ -385,10 +395,13 @@ services:
           memory: 1G
 
   #############################################################################
-  # Celery Workers - Recording Rendering (PyPy, 2 replicas)
+  # Celery Workers - Recording Rendering (2 replicas)
   #############################################################################
   celery-record:
-    image: quay.io/ibh/b3lb:${B3LB_VERSION:-3.3.2}  # Using standard image instead of PyPy due to gi module issues
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.render
+    image: b3lb-render:${B3LB_VERSION:-latest}
     restart: unless-stopped
     networks:
       - backend
@@ -418,7 +431,7 @@ services:
       celery-beat:
         condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "celery -A b3lb inspect ping --destination celery@$HOSTNAME --timeout 10 | grep -q OK || exit 1"]
+      test: ["CMD-SHELL", "celery -A loadbalancer inspect ping --destination celery@$HOSTNAME --timeout 10 | grep -q OK || exit 1"]
       interval: 30s
       timeout: 15s
       retries: 3

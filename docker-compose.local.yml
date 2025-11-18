@@ -1,5 +1,3 @@
-version: '3.8'
-
 ###############################################################################
 # B3LB Local Development Environment
 #
@@ -100,7 +98,10 @@ services:
   # B3LB Frontend - Django API Server
   #############################################################################
   frontend:
-    image: quay.io/ibh/b3lb:${B3LB_VERSION:-3.3.2}
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+    image: b3lb:${B3LB_VERSION:-local-dev}
     container_name: b3lb-frontend-local
     restart: unless-stopped
     networks:
@@ -169,7 +170,10 @@ services:
   # Celery Beat - Task Scheduler (SINGLE INSTANCE ONLY!)
   #############################################################################
   celery-beat:
-    image: quay.io/ibh/b3lb:${B3LB_VERSION:-3.3.2}
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: b3lb:${B3LB_VERSION:-local-dev}
     container_name: b3lb-celery-beat-local
     restart: unless-stopped
     networks:
@@ -204,7 +208,10 @@ services:
   # Celery Worker - All Tasks (Single worker for local dev)
   #############################################################################
   celery-worker:
-    image: quay.io/ibh/b3lb:${B3LB_VERSION:-3.3.2}
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: b3lb:${B3LB_VERSION:-local-dev}
     container_name: b3lb-celery-worker-local
     restart: unless-stopped
     networks:
@@ -236,7 +243,7 @@ services:
       celery-beat:
         condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "celery -A b3lb inspect ping --destination celery@$HOSTNAME --timeout 10 | grep -q OK || exit 1"]
+      test: ["CMD-SHELL", "celery -A loadbalancer inspect ping --timeout 10 | grep -q OK || exit 1"]
       interval: 30s
       timeout: 15s
       retries: 3
@@ -248,7 +255,10 @@ services:
 # Uncomment this section if you need to test recording rendering locally
 
 #  celery-record:
-#    image: quay.io/ibh/b3lb:${B3LB_VERSION:-3.3.2}
+#    build:
+#      context: .
+#      dockerfile: docker/Dockerfile.render
+#    image: b3lb-render:${B3LB_VERSION:-local-dev}
 #    container_name: b3lb-celery-record-local
 #    restart: unless-stopped
 #    networks:
