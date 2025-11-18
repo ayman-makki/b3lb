@@ -256,7 +256,7 @@ services:
       # Middlewares
       - "traefik.http.routers.b3lb-api.middlewares=security-headers@file,compression@file"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/b3lb/ping"]
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/b3lb/ping').read()"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -326,7 +326,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "ps aux | grep -q 'celery beat' || exit 1"]
+      test: ["CMD-SHELL", "pgrep -f 'celery.*beat' > /dev/null || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -371,9 +371,9 @@ services:
       celery-beat:
         condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "celery -A b3lb inspect ping -d celery@$HOSTNAME | grep -q OK || exit 1"]
+      test: ["CMD-SHELL", "celery -A b3lb inspect ping --destination celery@$HOSTNAME --timeout 10 | grep -q OK || exit 1"]
       interval: 30s
-      timeout: 10s
+      timeout: 15s
       retries: 3
       start_period: 40s
     deploy:
@@ -418,9 +418,9 @@ services:
       celery-beat:
         condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "celery -A b3lb inspect ping -d celery@$HOSTNAME | grep -q OK || exit 1"]
+      test: ["CMD-SHELL", "celery -A b3lb inspect ping --destination celery@$HOSTNAME --timeout 10 | grep -q OK || exit 1"]
       interval: 30s
-      timeout: 10s
+      timeout: 15s
       retries: 3
       start_period: 60s
     deploy:
