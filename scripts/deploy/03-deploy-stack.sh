@@ -223,7 +223,7 @@ echo
 
 log_info "This may take several minutes..."
 
-if docker-compose -f docker-compose.hetzner-production.yml pull; then
+if docker compose -f docker-compose.hetzner-production.yml pull; then
     log_success "All images pulled successfully"
 else
     log_error "Failed to pull images"
@@ -239,9 +239,9 @@ echo
 log_step "Step 6/10: Stopping existing containers..."
 echo
 
-if docker-compose -f docker-compose.hetzner-production.yml ps -q 2>/dev/null | grep -q .; then
+if docker compose -f docker-compose.hetzner-production.yml ps -q 2>/dev/null | grep -q .; then
     log_info "Found existing containers, stopping..."
-    docker-compose -f docker-compose.hetzner-production.yml down
+    docker compose -f docker-compose.hetzner-production.yml down
     log_success "Existing containers stopped"
 else
     log_info "No existing containers found"
@@ -258,7 +258,7 @@ echo
 
 log_info "Starting PostgreSQL and Redis..."
 
-docker-compose -f docker-compose.hetzner-production.yml up -d postgres redis
+docker compose -f docker-compose.hetzner-production.yml up -d postgres redis
 
 # Wait for databases to be healthy
 log_info "Waiting for databases to be ready..."
@@ -268,7 +268,7 @@ MAX_RETRIES=30
 RETRY_COUNT=0
 
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    if docker-compose -f docker-compose.hetzner-production.yml ps postgres | grep -q "healthy"; then
+    if docker compose -f docker-compose.hetzner-production.yml ps postgres | grep -q "healthy"; then
         log_success "PostgreSQL is ready"
         break
     fi
@@ -279,7 +279,7 @@ done
 
 if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
     log_error "PostgreSQL failed to start"
-    docker-compose -f docker-compose.hetzner-production.yml logs postgres
+    docker compose -f docker-compose.hetzner-production.yml logs postgres
     exit 1
 fi
 
@@ -297,7 +297,7 @@ echo
 log_info "Applying Django migrations..."
 
 # Run migrations using temporary container
-docker-compose -f docker-compose.hetzner-production.yml run --rm \
+docker compose -f docker-compose.hetzner-production.yml run --rm \
     -e DATABASE_URL="postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}" \
     -e SECRET_KEY="${SECRET_KEY}" \
     --entrypoint "python manage.py migrate" \
@@ -308,7 +308,7 @@ log_success "Database migrations completed"
 # Collect static files
 log_info "Collecting static files..."
 
-docker-compose -f docker-compose.hetzner-production.yml run --rm \
+docker compose -f docker-compose.hetzner-production.yml run --rm \
     -e DATABASE_URL="postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}" \
     -e SECRET_KEY="${SECRET_KEY}" \
     --entrypoint "python manage.py collectstatic --noinput" \
@@ -326,7 +326,7 @@ echo
 
 log_info "Starting B3LB stack (this may take a minute)..."
 
-if docker-compose -f docker-compose.hetzner-production.yml up -d; then
+if docker compose -f docker-compose.hetzner-production.yml up -d; then
     log_success "All services started"
 else
     log_error "Failed to start services"
@@ -346,7 +346,7 @@ echo
 log_step "Step 10/10: Creating Django superuser..."
 echo
 
-if docker-compose -f docker-compose.hetzner-production.yml exec -T frontend \
+if docker compose -f docker-compose.hetzner-production.yml exec -T frontend \
     python manage.py shell -c "from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(username='admin').exists()" 2>/dev/null | grep -q "True"; then
     log_info "Superuser 'admin' already exists"
 else
@@ -354,7 +354,7 @@ else
     log_warning "You will be prompted to set a password for the admin user"
     echo
 
-    docker-compose -f docker-compose.hetzner-production.yml exec frontend \
+    docker compose -f docker-compose.hetzner-production.yml exec frontend \
         python manage.py createsuperuser --username admin --email admin@b3lb.serveur.cc || true
 
     log_success "Superuser created"
@@ -408,7 +408,7 @@ echo "  3. Test the API:"
 echo "     curl https://your-tenant.b3lb.serveur.cc/bigbluebutton/api"
 echo
 echo "  4. Monitor logs:"
-echo "     docker-compose -f docker-compose.hetzner-production.yml logs -f"
+echo "     docker compose -f docker-compose.hetzner-production.yml logs -f"
 echo
 
 log_info "Documentation:"

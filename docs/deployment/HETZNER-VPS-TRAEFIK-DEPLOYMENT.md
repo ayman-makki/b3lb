@@ -193,7 +193,7 @@ docker compose version
 
 ```bash
 cd /opt
-git clone https://github.com/DE-IBH/b3lb.git
+git clone https://github.com/ayman-makki/b3lb
 cd b3lb
 ```
 
