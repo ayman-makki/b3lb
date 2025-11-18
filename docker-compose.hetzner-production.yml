@@ -14,7 +14,7 @@ version: '3.8'
 # - Grafana dashboards
 #
 # Requirements:
-# - Domain: *.b3lb.serveur.cc pointing to server IP
+# - Domain: *.b3lb.example.com pointing to server IP
 # - Hetzner DNS API token for ACME
 # - Hetzner Storage Box mounted at /mnt/b3lb-recordings
 # - 64GB RAM, 14 cores (Hetzner EX44)
@@ -71,7 +71,7 @@ services:
     labels:
       - "traefik.enable=true"
       # Dashboard
-      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.b3lb.serveur.cc`)"
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${B3LB_API_BASE_DOMAIN}`)"
       - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
       - "traefik.http.routers.traefik-dashboard.tls=true"
       - "traefik.http.routers.traefik-dashboard.tls.certresolver=hetzner"
@@ -197,7 +197,7 @@ services:
       # Core Django settings
       - SECRET_KEY=${SECRET_KEY}
       - DEBUG=False
-      - ALLOWED_HOSTS=b3lb.serveur.cc,*.b3lb.serveur.cc
+      - ALLOWED_HOSTS=${B3LB_API_BASE_DOMAIN},*.${B3LB_API_BASE_DOMAIN}
       - LANGUAGE_CODE=en-us
       - TIME_ZONE=${TIME_ZONE:-Europe/Paris}
 
@@ -216,7 +216,7 @@ services:
       - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@redis:6379/0
 
       # B3LB Configuration
-      - B3LB_API_BASE_DOMAIN=b3lb.serveur.cc
+      - B3LB_API_BASE_DOMAIN=${B3LB_API_BASE_DOMAIN}
       - B3LB_NODE_PROTOCOL=https://
       - B3LB_NODE_REQUEST_TIMEOUT=5
       - WEB_CONCURRENCY=${WEB_CONCURRENCY:-5}
@@ -246,12 +246,12 @@ services:
     labels:
       - "traefik.enable=true"
       # API endpoints with wildcard
-      - "traefik.http.routers.b3lb-api.rule=HostRegexp(`{subdomain:[a-z0-9-]+}.b3lb.serveur.cc`) || Host(`b3lb.serveur.cc`)"
+      - "traefik.http.routers.b3lb-api.rule=HostRegexp(`{subdomain:[a-z0-9-]+}.${B3LB_API_BASE_DOMAIN}`) || Host(`${B3LB_API_BASE_DOMAIN}`)"
       - "traefik.http.routers.b3lb-api.entrypoints=websecure"
       - "traefik.http.routers.b3lb-api.tls=true"
       - "traefik.http.routers.b3lb-api.tls.certresolver=hetzner"
-      - "traefik.http.routers.b3lb-api.tls.domains[0].main=b3lb.serveur.cc"
-      - "traefik.http.routers.b3lb-api.tls.domains[0].sans=*.b3lb.serveur.cc"
+      - "traefik.http.routers.b3lb-api.tls.domains[0].main=${B3LB_API_BASE_DOMAIN}"
+      - "traefik.http.routers.b3lb-api.tls.domains[0].sans=*.${B3LB_API_BASE_DOMAIN}"
       - "traefik.http.services.b3lb-api.loadbalancer.server.port=8000"
       # Middlewares
       - "traefik.http.routers.b3lb-api.middlewares=security-headers@file,compression@file"
@@ -280,7 +280,7 @@ services:
       - traefik
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.b3lb-static.rule=Host(`static.b3lb.serveur.cc`)"
+      - "traefik.http.routers.b3lb-static.rule=Host(`static.${B3LB_API_BASE_DOMAIN}`)"
       - "traefik.http.routers.b3lb-static.entrypoints=websecure"
       - "traefik.http.routers.b3lb-static.tls=true"
       - "traefik.http.routers.b3lb-static.tls.certresolver=hetzner"
@@ -314,6 +314,7 @@ services:
       - CACHEOPS_REDIS=redis://:${REDIS_PASSWORD}@redis:6379/2
       - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - B3LB_API_BASE_DOMAIN=${B3LB_API_BASE_DOMAIN}
       - B3LB_TASK_QUEUE_CORE=b3lb-core
       - B3LB_TASK_QUEUE_HOUSEKEEPING=b3lb-housekeeping
       - B3LB_TASK_QUEUE_RECORD=b3lb-record
@@ -354,11 +355,13 @@ services:
       - CACHEOPS_REDIS=redis://:${REDIS_PASSWORD}@redis:6379/2
       - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - B3LB_API_BASE_DOMAIN=${B3LB_API_BASE_DOMAIN}
       - B3LB_TASK_QUEUE_CORE=b3lb-core
       - B3LB_TASK_QUEUE_HOUSEKEEPING=b3lb-housekeeping
       - B3LB_TASK_QUEUE_STATISTICS=b3lb-stats
       - B3LB_NODE_PROTOCOL=https://
       - B3LB_NODE_REQUEST_TIMEOUT=5
+      - HOSTNAME
     command: celery-tasks
     depends_on:
       postgres:
@@ -398,12 +401,14 @@ services:
       - CACHEOPS_REDIS=redis://:${REDIS_PASSWORD}@redis:6379/2
       - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - B3LB_API_BASE_DOMAIN=${B3LB_API_BASE_DOMAIN}
       - B3LB_TASK_QUEUE_RECORD=b3lb-record
       - B3LB_RENDERING=True
       - B3LB_RECORD_STORAGE=local
       - B3LB_RECORD_LOCAL_PATH=/recordings
       # Recording rendering settings
       - B3LB_RECORD_PROFILES=${B3LB_RECORD_PROFILES:-720p,1080p}
+      - HOSTNAME
     command: celery-tasks
     depends_on:
       postgres:
@@ -449,7 +454,7 @@ services:
       - '--web.enable-lifecycle'
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.prometheus.rule=Host(`prometheus.b3lb.serveur.cc`)"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.${B3LB_API_BASE_DOMAIN}`)"
       - "traefik.http.routers.prometheus.entrypoints=websecure"
       - "traefik.http.routers.prometheus.tls=true"
       - "traefik.http.routers.prometheus.tls.certresolver=hetzner"
@@ -482,7 +487,7 @@ services:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
     environment:
-      - GF_SERVER_ROOT_URL=https://grafana.b3lb.serveur.cc
+      - GF_SERVER_ROOT_URL=https://grafana.${B3LB_API_BASE_DOMAIN}
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
       - GF_USERS_ALLOW_SIGN_UP=false
@@ -490,7 +495,7 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=false
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.grafana.rule=Host(`grafana.b3lb.serveur.cc`)"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.${B3LB_API_BASE_DOMAIN}`)"
       - "traefik.http.routers.grafana.entrypoints=websecure"
       - "traefik.http.routers.grafana.tls=true"
       - "traefik.http.routers.grafana.tls.certresolver=hetzner"

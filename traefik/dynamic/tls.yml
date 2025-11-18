@@ -76,7 +76,7 @@ tls:
   # Certificates (manual certificate configuration - optional)
   ###########################################################################
   # certificates:
-  #   - certFile: /certs/b3lb.serveur.cc.crt
-  #     keyFile: /certs/b3lb.serveur.cc.key
+  #   - certFile: /certs/b3lb.example.com.crt
+  #     keyFile: /certs/b3lb.example.com.key
   #     stores:
   #       - default

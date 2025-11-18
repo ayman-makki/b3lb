@@ -109,8 +109,8 @@ scrape_configs:
   #     module: [http_2xx]
   #   static_configs:
   #     - targets:
-  #         - https://b3lb.serveur.cc/b3lb/ping
-  #         - https://traefik.b3lb.serveur.cc
+  #         - https://b3lb.example.com/b3lb/ping
+  #         - https://traefik.b3lb.example.com
   #   relabel_configs:
   #     - source_labels: [__address__]
   #       target_label: __param_target

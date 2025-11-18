@@ -34,7 +34,7 @@ This deployment guide covers installing B3LB on a **Hetzner EX44 dedicated serve
 ### Key Features
 
 ✅ **Multi-tenant support** - Multiple organizations on one server
-✅ **Wildcard SSL** - Automatic certificates for `*.b3lb.serveur.cc`
+✅ **Wildcard SSL** - Automatic certificates for `*.b3lb.example.com`
 ✅ **High availability** - 3 frontend replicas
 ✅ **Recording processing** - Video rendering with Storage Box
 ✅ **Comprehensive monitoring** - Prometheus + Grafana dashboards
@@ -73,7 +73,7 @@ This deployment guide covers installing B3LB on a **Hetzner EX44 dedicated serve
 1. **Dedicated Server**: EX44 or similar (ordered from Hetzner)
 2. **Storage Box**: 5TB (ordered from Hetzner Robot panel)
 3. **DNS Service**: Hetzner DNS (free) with API access
-4. **Domain**: `b3lb.serveur.cc` (or your domain)
+4. **Domain**: `b3lb.example.com` (or your domain)
 
 ### Access Requirements
 
@@ -208,8 +208,8 @@ Configure in **Hetzner DNS Console** (https://dns.hetzner.com):
 ```dns
 Type    Name                TTL     Value
 ────────────────────────────────────────────────────
-A       b3lb.serveur.cc     3600    YOUR_SERVER_IP
-A       *.b3lb.serveur.cc   3600    YOUR_SERVER_IP
+A       b3lb.example.com     3600    YOUR_SERVER_IP
+A       *.b3lb.example.com   3600    YOUR_SERVER_IP
 ```
 
 ### Alternative: CNAME Wildcard
@@ -217,8 +217,8 @@ A       *.b3lb.serveur.cc   3600    YOUR_SERVER_IP
 ```dns
 Type    Name                TTL     Value
 ────────────────────────────────────────────────────
-A       b3lb.serveur.cc     3600    YOUR_SERVER_IP
-CNAME   *.b3lb.serveur.cc   3600    b3lb.serveur.cc
+A       b3lb.example.com     3600    YOUR_SERVER_IP
+CNAME   *.b3lb.example.com   3600    b3lb.example.com
 ```
 
 ### Get Hetzner DNS API Token
@@ -231,10 +231,10 @@ CNAME   *.b3lb.serveur.cc   3600    b3lb.serveur.cc
 
 ```bash
 # Check main domain
-dig +short b3lb.serveur.cc
+dig +short b3lb.example.com
 
 # Check wildcard
-dig +short test-tenant.b3lb.serveur.cc
+dig +short test-tenant.b3lb.example.com
 ```
 
 Both should return your server IP.
@@ -400,7 +400,7 @@ Check logs:
 docker-compose -f docker-compose.hetzner-production.yml logs -f traefik
 ```
 
-Look for: `Certificate obtained for domain *.b3lb.serveur.cc`
+Look for: `Certificate obtained for domain *.b3lb.example.com`
 
 ---
 
@@ -410,11 +410,11 @@ Look for: `Certificate obtained for domain *.b3lb.serveur.cc`
 
 | Service | URL | Credentials |
 |---------|-----|-------------|
-| **B3LB API** | https://b3lb.serveur.cc | N/A |
-| **Django Admin** | https://b3lb.serveur.cc/admin/ | admin / your-password |
-| **Traefik Dashboard** | https://traefik.b3lb.serveur.cc | From `.env` or `.traefik-password.txt` |
-| **Grafana** | https://grafana.b3lb.serveur.cc | admin / from `.env` |
-| **Prometheus** | https://prometheus.b3lb.serveur.cc | (protected by Traefik auth) |
+| **B3LB API** | https://b3lb.example.com | N/A |
+| **Django Admin** | https://b3lb.example.com/admin/ | admin / your-password |
+| **Traefik Dashboard** | https://traefik.b3lb.example.com | From `.env` or `.traefik-password.txt` |
+| **Grafana** | https://grafana.b3lb.example.com | admin / from `.env` |
+| **Prometheus** | https://prometheus.b3lb.example.com | (protected by Traefik auth) |
 
 ### Initial Configuration
 
@@ -431,7 +431,7 @@ See [INITIAL-CONFIGURATION.md](./INITIAL-CONFIGURATION.md) for:
 
 ### Grafana Dashboards
 
-Access Grafana at: https://grafana.b3lb.serveur.cc
+Access Grafana at: https://grafana.b3lb.example.com
 
 **Available Dashboards:**
 - B3LB Overview: Tenants, meetings, nodes, recordings
@@ -442,7 +442,7 @@ Access Grafana at: https://grafana.b3lb.serveur.cc
 
 ### Prometheus Metrics
 
-Access raw metrics: https://prometheus.b3lb.serveur.cc
+Access raw metrics: https://prometheus.b3lb.example.com
 
 **Key Metrics:**
 - `b3lb_meetings_total` - Total active meetings
@@ -513,7 +513,7 @@ sudo ./scripts/backup/restore.sh /mnt/b3lb-recordings/backups/backup-2025-01-15.
 **Problem**: Certificate not obtained after 10 minutes
 
 **Solutions:**
-1. Check DNS propagation: `dig +short b3lb.serveur.cc`
+1. Check DNS propagation: `dig +short b3lb.example.com`
 2. Verify Hetzner DNS API token in `.env`
 3. Check Traefik logs: `docker-compose logs traefik`
 4. Ensure ports 80 and 443 are open

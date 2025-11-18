@@ -202,8 +202,8 @@ STORAGEBOX_PASSWORD="your-password"
 ### DNS Records
 
 ```dns
-A     b3lb.serveur.cc        YOUR_SERVER_IP
-A     *.b3lb.serveur.cc      YOUR_SERVER_IP
+A     b3lb.example.com        YOUR_SERVER_IP
+A     *.b3lb.example.com      YOUR_SERVER_IP
 ```
 
 ### Firewall Rules
@@ -283,10 +283,10 @@ docker-compose -f docker-compose.hetzner-production.yml exec frontend \
 
 | Service | URL | Credentials |
 |---------|-----|-------------|
-| **Grafana** | https://grafana.b3lb.serveur.cc | admin / (from .env) |
-| **Prometheus** | https://prometheus.b3lb.serveur.cc | (Traefik auth) |
-| **Traefik Dashboard** | https://traefik.b3lb.serveur.cc | (from .env) |
-| **Django Admin** | https://b3lb.serveur.cc/admin/ | admin / (set during deploy) |
+| **Grafana** | https://grafana.b3lb.example.com | admin / (from .env) |
+| **Prometheus** | https://prometheus.b3lb.example.com | (Traefik auth) |
+| **Traefik Dashboard** | https://traefik.b3lb.example.com | (from .env) |
+| **Django Admin** | https://b3lb.example.com/admin/ | admin / (set during deploy) |
 
 ### Key Metrics
 
@@ -306,7 +306,7 @@ docker-compose -f docker-compose.hetzner-production.yml exec frontend \
 **Symptom**: Certificate not issued after 10 minutes
 
 **Check**:
-1. DNS propagation: `dig +short b3lb.serveur.cc`
+1. DNS propagation: `dig +short b3lb.example.com`
 2. API token valid in `.env`
 3. Traefik logs: `docker-compose logs traefik | grep acme`
 

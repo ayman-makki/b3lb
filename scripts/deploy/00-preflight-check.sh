@@ -179,7 +179,7 @@ if [ -f "../../.env" ]; then
     export $(grep -v '^#' ../../.env | grep -v '^$' | xargs)
 fi
 
-DOMAIN="b3lb.serveur.cc"
+DOMAIN="b3lb.example.com"
 
 # Check if domain resolves
 if host "${DOMAIN}" &> /dev/null; then

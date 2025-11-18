@@ -355,7 +355,7 @@ else
     echo
 
     docker compose -f docker-compose.hetzner-production.yml exec frontend \
-        python manage.py createsuperuser --username admin --email admin@b3lb.serveur.cc || true
+        python manage.py createsuperuser --username admin --email admin@b3lb.example.com || true
 
     log_success "Superuser created"
 fi
@@ -376,11 +376,11 @@ log_success "All services are running!"
 echo
 
 log_info "Service URLs:"
-echo "  - B3LB API:           https://b3lb.serveur.cc"
-echo "  - Django Admin:       https://b3lb.serveur.cc/admin/"
-echo "  - Traefik Dashboard:  https://traefik.b3lb.serveur.cc"
-echo "  - Grafana:            https://grafana.b3lb.serveur.cc"
-echo "  - Prometheus:         https://prometheus.b3lb.serveur.cc"
+echo "  - B3LB API:           https://${B3LB_API_BASE_DOMAIN}"
+echo "  - Django Admin:       https://${B3LB_API_BASE_DOMAIN}/admin/"
+echo "  - Traefik Dashboard:  https://traefik.${B3LB_API_BASE_DOMAIN}"
+echo "  - Grafana:            https://grafana.${B3LB_API_BASE_DOMAIN}"
+echo "  - Prometheus:         https://prometheus.${B3LB_API_BASE_DOMAIN}"
 echo
 
 log_info "Credentials:"
@@ -397,7 +397,7 @@ echo "  1. Run post-deployment verification:"
 echo "     ./scripts/deploy/04-post-deploy-verify.sh"
 echo
 echo "  2. Configure your first tenant:"
-echo "     - Go to: https://b3lb.serveur.cc/admin/"
+echo "     - Go to: https://${B3LB_API_BASE_DOMAIN}/admin/"
 echo "     - Add a Cluster Group"
 echo "     - Add a Cluster"
 echo "     - Add your BBB Nodes"
@@ -405,7 +405,7 @@ echo "     - Add a Tenant"
 echo "     - Generate API secrets"
 echo
 echo "  3. Test the API:"
-echo "     curl https://your-tenant.b3lb.serveur.cc/bigbluebutton/api"
+echo "     curl https://your-tenant.${B3LB_API_BASE_DOMAIN}/bigbluebutton/api"
 echo
 echo "  4. Monitor logs:"
 echo "     docker compose -f docker-compose.hetzner-production.yml logs -f"

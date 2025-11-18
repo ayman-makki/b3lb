@@ -22,7 +22,7 @@
 
 ### 1. Open Django Admin Interface
 
-Navigate to: https://b3lb.serveur.cc/admin/
+Navigate to: https://b3lb.example.com/admin/
 
 ### 2. Login with Superuser Credentials
 
@@ -173,16 +173,16 @@ Tenants are organizations or departments using your B3LB service. Each tenant ge
 
 Based on slug `my-organization`, the tenant's API endpoint will be:
 ```
-https://my-organization.b3lb.serveur.cc/bigbluebutton/api
+https://my-organization.b3lb.example.com/bigbluebutton/api
 ```
 
 ### Multiple Tenant Example:
 
 | Organization | Slug | Endpoint |
 |--------------|------|----------|
-| Engineering Team | `engineering` | `https://engineering.b3lb.serveur.cc/bigbluebutton/api` |
-| Sales Team | `sales` | `https://sales.b3lb.serveur.cc/bigbluebutton/api` |
-| Customer A | `customer-a` | `https://customer-a.b3lb.serveur.cc/bigbluebutton/api` |
+| Engineering Team | `engineering` | `https://engineering.b3lb.example.com/bigbluebutton/api` |
+| Sales Team | `sales` | `https://sales.b3lb.example.com/bigbluebutton/api` |
+| Customer A | `customer-a` | `https://customer-a.b3lb.example.com/bigbluebutton/api` |
 
 ---
 
@@ -227,14 +227,14 @@ For zero-downtime secret rotation:
 ### 1. Test getMeetings Endpoint
 
 ```bash
-curl "https://my-organization.b3lb.serveur.cc/bigbluebutton/api/getMeetings?checksum=..."
+curl "https://my-organization.b3lb.example.com/bigbluebutton/api/getMeetings?checksum=..."
 ```
 
 For easier testing, use B3LB's built-in test page:
 
 ```bash
 # Get checksum helper
-curl "https://my-organization.b3lb.serveur.cc/bigbluebutton/api"
+curl "https://my-organization.b3lb.example.com/bigbluebutton/api"
 ```
 
 ### 2. Test with bbb-conf --check
@@ -242,7 +242,7 @@ curl "https://my-organization.b3lb.serveur.cc/bigbluebutton/api"
 On your frontend server (Greenlight, Moodle, etc.), configure:
 
 ```
-BBB_SERVER_URL=https://my-organization.b3lb.serveur.cc/bigbluebutton/
+BBB_SERVER_URL=https://my-organization.b3lb.example.com/bigbluebutton/
 BBB_SECRET=a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
 ```
 
@@ -259,7 +259,7 @@ Use the official BBB API MATE tool:
 https://mconf.github.io/api-mate/
 
 Enter:
-- **Server URL**: `https://my-organization.b3lb.serveur.cc/bigbluebutton/api`
+- **Server URL**: `https://my-organization.b3lb.example.com/bigbluebutton/api`
 - **Secret**: Your generated secret
 
 Click "create" to test meeting creation.
@@ -364,10 +364,10 @@ Each tenant is **fully isolated**:
 
 1. Upload logo to `/opt/b3lb/media/logos/tenant-a-logo.png`
 2. Edit tenant:
-   - **Logo URL**: `https://static.b3lb.serveur.cc/logos/tenant-a-logo.png`
+   - **Logo URL**: `https://static.b3lb.example.com/logos/tenant-a-logo.png`
 3. Upload default slides to `/opt/b3lb/media/slides/tenant-a-default.pdf`
 4. Edit tenant:
-   - **Slide URL**: `https://static.b3lb.serveur.cc/slides/tenant-a-default.pdf`
+   - **Slide URL**: `https://static.b3lb.example.com/slides/tenant-a-default.pdf`
 
 ### Custom BBB Parameters
 
@@ -425,10 +425,10 @@ After configuration, verify:
 
 ### Tenant Endpoint Not Accessible
 
-**Problem**: `https://my-tenant.b3lb.serveur.cc` returns 404
+**Problem**: `https://my-tenant.b3lb.example.com` returns 404
 
 **Solutions**:
-1. Verify wildcard DNS: `dig +short my-tenant.b3lb.serveur.cc`
+1. Verify wildcard DNS: `dig +short my-tenant.b3lb.example.com`
 2. Check Traefik logs: `docker-compose logs traefik`
 3. Verify tenant slug matches subdomain
 4. Restart Traefik: `docker-compose restart traefik`
