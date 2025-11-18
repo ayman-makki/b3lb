@@ -1,0 +1,286 @@
+version: '3.8'
+
+###############################################################################
+# B3LB Local Development Environment
+#
+# Simplified docker-compose for local development with:
+# - PostgreSQL database (exposed port for local tools)
+# - Redis cache/broker (exposed port for local tools)
+# - B3LB frontend with volume mount for live reload
+# - Celery beat (task scheduler)
+# - Celery worker (all queues)
+#
+# NO Traefik, NO monitoring, NO replicas, NO SSL
+#
+# Usage:
+#   1. Copy .env.local to .env: cp .env.local .env
+#   2. Start services: docker-compose -f docker-compose.local.yml up -d
+#   3. Check health: docker-compose -f docker-compose.local.yml ps
+#   4. Run migrations: docker-compose -f docker-compose.local.yml exec frontend ./manage.py migrate
+#   5. Create superuser: docker-compose -f docker-compose.local.yml exec frontend ./manage.py createsuperuser
+#   6. Access: http://localhost:8000/admin/
+#
+# To stop:
+#   docker-compose -f docker-compose.local.yml down
+#
+# To remove volumes (clean start):
+#   docker-compose -f docker-compose.local.yml down -v
+###############################################################################
+
+networks:
+  b3lb-local:
+    name: b3lb-local
+    driver: bridge
+
+volumes:
+  postgres_data_local:
+    driver: local
+  redis_data_local:
+    driver: local
+
+services:
+  #############################################################################
+  # PostgreSQL - Database
+  #############################################################################
+  postgres:
+    image: postgres:16-alpine
+    container_name: b3lb-postgres-local
+    restart: unless-stopped
+    networks:
+      - b3lb-local
+    ports:
+      - "5432:5432"  # Exposed for local database tools
+    volumes:
+      - postgres_data_local:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-b3lb_dev}
+      - POSTGRES_USER=${POSTGRES_USER:-b3lb_dev}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-dev_password_change_in_production}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
+    command: >
+      postgres
+      -c max_connections=100
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=128MB
+      -c work_mem=16MB
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-b3lb_dev} -d ${POSTGRES_DB:-b3lb_dev}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  #############################################################################
+  # Redis - Cache & Message Broker
+  #############################################################################
+  redis:
+    image: redis:7-alpine
+    container_name: b3lb-redis-local
+    restart: unless-stopped
+    networks:
+      - b3lb-local
+    ports:
+      - "6379:6379"  # Exposed for local Redis tools
+    volumes:
+      - redis_data_local:/data
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-dev_redis_password}
+      --maxmemory 1gb
+      --maxmemory-policy allkeys-lru
+      --save 60 1000
+      --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  #############################################################################
+  # B3LB Frontend - Django API Server
+  #############################################################################
+  frontend:
+    image: quay.io/ibh/b3lb:${B3LB_VERSION:-3.3.2}
+    container_name: b3lb-frontend-local
+    restart: unless-stopped
+    networks:
+      - b3lb-local
+    ports:
+      - "8000:8000"  # Main API access point
+    volumes:
+      # Mount b3lb directory for live code changes (includes rest/, loadbalancer/, etc.)
+      - ./b3lb:/usr/src/app
+      - ./media:/usr/src/app/media
+      - ./recordings:/recordings
+    environment:
+      # Core Django settings
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=${DEBUG:-True}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1,frontend}
+      - LANGUAGE_CODE=${LANGUAGE_CODE:-en-us}
+      - TIME_ZONE=${TIME_ZONE:-UTC}
+      - DJANGO_LOG_LEVEL=${DJANGO_LOG_LEVEL:-INFO}
+
+      # Database
+      - DATABASE_URL=${DATABASE_URL:-postgres://b3lb_dev:dev_password_change_in_production@postgres:5432/b3lb_dev}
+
+      # Redis - Cache (DB 1)
+      - CACHE_URL=${CACHE_URL:-redis://:dev_redis_password@redis:6379/1}
+
+      # Redis - ORM Cache (DB 2)
+      - CACHEOPS_REDIS=${CACHEOPS_REDIS:-redis://:dev_redis_password@redis:6379/2}
+      - CACHEOPS_DEGRADE_ON_FAILURE=${CACHEOPS_DEGRADE_ON_FAILURE:-True}
+
+      # Celery - Broker (DB 0)
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://:dev_redis_password@redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://:dev_redis_password@redis:6379/0}
+
+      # B3LB Configuration
+      - B3LB_API_BASE_DOMAIN=${B3LB_API_BASE_DOMAIN:-localhost}
+      - B3LB_NODE_PROTOCOL=${B3LB_NODE_PROTOCOL:-http://}
+      - B3LB_NODE_REQUEST_TIMEOUT=${B3LB_NODE_REQUEST_TIMEOUT:-10}
+      - WEB_CONCURRENCY=${WEB_CONCURRENCY:-2}
+
+      # Recording Configuration (disabled by default)
+      - B3LB_RENDERING=${B3LB_RENDERING:-False}
+      - B3LB_RECORD_STORAGE=${B3LB_RECORD_STORAGE:-local}
+      - B3LB_RECORD_LOCAL_PATH=${B3LB_RECORD_LOCAL_PATH:-/recordings}
+      - B3LB_RECORD_PROFILES=${B3LB_RECORD_PROFILES:-720p}
+
+      # Task Queues
+      - B3LB_TASK_QUEUE_CORE=${B3LB_TASK_QUEUE_CORE:-b3lb}
+      - B3LB_TASK_QUEUE_HOUSEKEEPING=${B3LB_TASK_QUEUE_HOUSEKEEPING:-b3lb}
+      - B3LB_TASK_QUEUE_RECORD=${B3LB_TASK_QUEUE_RECORD:-b3lb-record}
+      - B3LB_TASK_QUEUE_STATISTICS=${B3LB_TASK_QUEUE_STATISTICS:-b3lb}
+    command: uvicorn
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/b3lb/ping').read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  #############################################################################
+  # Celery Beat - Task Scheduler (SINGLE INSTANCE ONLY!)
+  #############################################################################
+  celery-beat:
+    image: quay.io/ibh/b3lb:${B3LB_VERSION:-3.3.2}
+    container_name: b3lb-celery-beat-local
+    restart: unless-stopped
+    networks:
+      - b3lb-local
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=${DEBUG:-True}
+      - DATABASE_URL=${DATABASE_URL:-postgres://b3lb_dev:dev_password_change_in_production@postgres:5432/b3lb_dev}
+      - CACHE_URL=${CACHE_URL:-redis://:dev_redis_password@redis:6379/1}
+      - CACHEOPS_REDIS=${CACHEOPS_REDIS:-redis://:dev_redis_password@redis:6379/2}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://:dev_redis_password@redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://:dev_redis_password@redis:6379/0}
+      - B3LB_API_BASE_DOMAIN=${B3LB_API_BASE_DOMAIN:-localhost}
+      - B3LB_TASK_QUEUE_CORE=${B3LB_TASK_QUEUE_CORE:-b3lb}
+      - B3LB_TASK_QUEUE_HOUSEKEEPING=${B3LB_TASK_QUEUE_HOUSEKEEPING:-b3lb}
+      - B3LB_TASK_QUEUE_RECORD=${B3LB_TASK_QUEUE_RECORD:-b3lb-record}
+      - B3LB_TASK_QUEUE_STATISTICS=${B3LB_TASK_QUEUE_STATISTICS:-b3lb}
+    command: celery-beat
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'celery.*beat' > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  #############################################################################
+  # Celery Worker - All Tasks (Single worker for local dev)
+  #############################################################################
+  celery-worker:
+    image: quay.io/ibh/b3lb:${B3LB_VERSION:-3.3.2}
+    container_name: b3lb-celery-worker-local
+    restart: unless-stopped
+    networks:
+      - b3lb-local
+    volumes:
+      - ./recordings:/recordings
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=${DEBUG:-True}
+      - DATABASE_URL=${DATABASE_URL:-postgres://b3lb_dev:dev_password_change_in_production@postgres:5432/b3lb_dev}
+      - CACHE_URL=${CACHE_URL:-redis://:dev_redis_password@redis:6379/1}
+      - CACHEOPS_REDIS=${CACHEOPS_REDIS:-redis://:dev_redis_password@redis:6379/2}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://:dev_redis_password@redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://:dev_redis_password@redis:6379/0}
+      - B3LB_API_BASE_DOMAIN=${B3LB_API_BASE_DOMAIN:-localhost}
+      - B3LB_TASK_QUEUE_CORE=${B3LB_TASK_QUEUE_CORE:-b3lb}
+      - B3LB_TASK_QUEUE_HOUSEKEEPING=${B3LB_TASK_QUEUE_HOUSEKEEPING:-b3lb}
+      - B3LB_TASK_QUEUE_STATISTICS=${B3LB_TASK_QUEUE_STATISTICS:-b3lb}
+      - B3LB_NODE_PROTOCOL=${B3LB_NODE_PROTOCOL:-http://}
+      - B3LB_NODE_REQUEST_TIMEOUT=${B3LB_NODE_REQUEST_TIMEOUT:-10}
+      - B3LB_RENDERING=${B3LB_RENDERING:-False}
+      - HOSTNAME=celery-worker-local
+    command: celery-tasks
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      celery-beat:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A b3lb inspect ping --destination celery@$HOSTNAME --timeout 10 | grep -q OK || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 40s
+
+###############################################################################
+# Optional: Recording Worker (only enable if testing recording features)
+###############################################################################
+# Uncomment this section if you need to test recording rendering locally
+
+#  celery-record:
+#    image: quay.io/ibh/b3lb:${B3LB_VERSION:-3.3.2}
+#    container_name: b3lb-celery-record-local
+#    restart: unless-stopped
+#    networks:
+#      - b3lb-local
+#    volumes:
+#      - ./recordings:/recordings
+#    environment:
+#      - SECRET_KEY=${SECRET_KEY}
+#      - DEBUG=${DEBUG:-True}
+#      - DATABASE_URL=${DATABASE_URL:-postgres://b3lb_dev:dev_password_change_in_production@postgres:5432/b3lb_dev}
+#      - CACHE_URL=${CACHE_URL:-redis://:dev_redis_password@redis:6379/1}
+#      - CACHEOPS_REDIS=${CACHEOPS_REDIS:-redis://:dev_redis_password@redis:6379/2}
+#      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://:dev_redis_password@redis:6379/0}
+#      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://:dev_redis_password@redis:6379/0}
+#      - B3LB_API_BASE_DOMAIN=${B3LB_API_BASE_DOMAIN:-localhost}
+#      - B3LB_TASK_QUEUE_RECORD=${B3LB_TASK_QUEUE_RECORD:-b3lb-record}
+#      - B3LB_RENDERING=True
+#      - B3LB_RECORD_STORAGE=${B3LB_RECORD_STORAGE:-local}
+#      - B3LB_RECORD_LOCAL_PATH=${B3LB_RECORD_LOCAL_PATH:-/recordings}
+#      - B3LB_RECORD_PROFILES=${B3LB_RECORD_PROFILES:-720p}
+#      - HOSTNAME=celery-record-local
+#    command: celery-tasks
+#    depends_on:
+#      postgres:
+#        condition: service_healthy
+#      redis:
+#        condition: service_healthy
+#      celery-beat:
+#        condition: service_started
+#    healthcheck:
+#      test: ["CMD-SHELL", "celery -A b3lb inspect ping --destination celery@$HOSTNAME --timeout 10 | grep -q OK || exit 1"]
+#      interval: 30s
+#      timeout: 15s
+#      retries: 3
+#      start_period: 60s
