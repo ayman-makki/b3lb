@@ -238,7 +238,7 @@ services:
       - B3LB_S3_SECRET_KEY=${S3_SECRET_KEY:-}
       - B3LB_S3_BUCKET_NAME=${S3_BUCKET_NAME:-}
       - B3LB_S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-}
-    command: uvicorn
+    command: uvicorn --host 0.0.0.0 --ws none --log-config=uvicorn_log.yml
     depends_on:
       postgres:
         condition: service_healthy
