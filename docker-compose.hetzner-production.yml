@@ -296,6 +296,7 @@ services:
       - "traefik.http.routers.b3lb-static-main.tls=true"
       - "traefik.http.routers.b3lb-static-main.tls.certresolver=hetzner"
       - "traefik.http.routers.b3lb-static-main.middlewares=strip-static,compression@file"
+      - "traefik.http.routers.b3lb-static-main.priority=100"
       # Middleware to strip /static prefix
       - "traefik.http.middlewares.strip-static.stripprefix.prefixes=/static"
       # Service definition
