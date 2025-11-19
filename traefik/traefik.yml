@@ -67,16 +67,16 @@ certificatesResolvers:
 
       # Use Let's Encrypt production server
       # For testing, use: https://acme-staging-v02.api.letsencrypt.org/directory
-      caServer: "https://acme-v02.api.letsencrypt.org/directory"
+      # caServer: "https://acme-v02.api.letsencrypt.org/directory"
 
       # DNS-01 Challenge with Hetzner DNS provider
       # The wildcard certificate will be generated based on docker-compose labels
       dnsChallenge:
         provider: hetzner
         delayBeforeCheck: 30
-        resolvers:
-          - "1.1.1.1:53"
-          - "8.8.8.8:53"
+        # resolvers:
+        #   - "1.1.1.1:53"
+        #   - "8.8.8.8:53"
 
 ###############################################################################
 # Providers
@@ -98,9 +98,9 @@ providers:
 # Logging
 ###############################################################################
 log:
-  level: INFO
-  format: json
-  filePath: "/var/log/traefik/traefik.log"
+  level: DEBUG
+  # format: json
+  # filePath: "/var/log/traefik/traefik.log"
 
 # Access logs
 accessLog:
