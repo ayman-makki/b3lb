@@ -284,12 +284,22 @@ services:
       - traefik
     labels:
       - "traefik.enable=true"
+      # Router for static.domain
       - "traefik.http.routers.b3lb-static.rule=Host(`static.${B3LB_API_BASE_DOMAIN}`)"
       - "traefik.http.routers.b3lb-static.entrypoints=websecure"
       - "traefik.http.routers.b3lb-static.tls=true"
       - "traefik.http.routers.b3lb-static.tls.certresolver=hetzner"
-      - "traefik.http.services.b3lb-static.loadbalancer.server.port=80"
       - "traefik.http.routers.b3lb-static.middlewares=compression@file"
+      # Router for main domain /static/ path
+      - "traefik.http.routers.b3lb-static-main.rule=Host(`${B3LB_API_BASE_DOMAIN}`) && PathPrefix(`/static`)"
+      - "traefik.http.routers.b3lb-static-main.entrypoints=websecure"
+      - "traefik.http.routers.b3lb-static-main.tls=true"
+      - "traefik.http.routers.b3lb-static-main.tls.certresolver=hetzner"
+      - "traefik.http.routers.b3lb-static-main.middlewares=strip-static,compression@file"
+      # Middleware to strip /static prefix
+      - "traefik.http.middlewares.strip-static.stripprefix.prefixes=/static"
+      # Service definition
+      - "traefik.http.services.b3lb-static.loadbalancer.server.port=80"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/admin/css/base.css"]
       interval: 30s
