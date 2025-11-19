@@ -137,6 +137,11 @@ collectstatic: ## Collect static files
 	@echo "$(GREEN)Collecting static files...$(NC)"
 	$(COMPOSE) exec $(FRONTEND) ./manage.py collectstatic --noinput
 
+loaddata: ## Load periodic tasks fixture
+	@echo "$(GREEN)Loading periodic tasks...$(NC)"
+	$(COMPOSE) exec $(FRONTEND) ./manage.py loaddata periodictasks
+	@echo "$(GREEN)Periodic tasks loaded!$(NC)"
+
 ##@ Database Management
 
 db-shell: ## Open PostgreSQL shell
