@@ -274,6 +274,50 @@ restart-celery: ## Restart Celery worker
 	$(COMPOSE) restart $(CELERY_WORKER)
 	@echo "$(GREEN)Celery worker restarted!$(NC)"
 
+##@ B3LB Management Commands
+
+addnode: ## Add new BBB cluster node (use: make addnode SLUG=hostname SECRET=secret CLUSTER=cluster-name)
+	@if [ -z "$(SLUG)" ] || [ -z "$(SECRET)" ] || [ -z "$(CLUSTER)" ]; then \
+		echo "$(RED)Error: Missing required parameters$(NC)"; \
+		echo "Usage: make addnode SLUG=hostname SECRET=secret CLUSTER=cluster-name"; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)Adding BBB node...$(NC)"
+	$(COMPOSE) exec $(FRONTEND) ./manage.py addnode --slug $(SLUG) --secret $(SECRET) --cluster $(CLUSTER)
+	@echo "$(GREEN)Node added successfully!$(NC)"
+
+addsecrets: ## Add tenant secrets (use: make addsecrets TENANT_SLUG=slug SUB_ID=0-10 or SUB_ID=5)
+	@if [ -z "$(TENANT_SLUG)" ] || [ -z "$(SUB_ID)" ]; then \
+		echo "$(RED)Error: Missing required parameters$(NC)"; \
+		echo "Usage: make addsecrets TENANT_SLUG=slug SUB_ID=0-10"; \
+		echo "       make addsecrets TENANT_SLUG=slug SUB_ID=5"; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)Adding tenant secrets...$(NC)"
+	$(COMPOSE) exec $(FRONTEND) ./manage.py addsecrets --tenant-slug $(TENANT_SLUG) --sub-id $(SUB_ID)
+	@echo "$(GREEN)Secrets added successfully!$(NC)"
+
+checkslides: ## Check and synchronize slides in slides folder
+	@echo "$(GREEN)Checking slides...$(NC)"
+	$(COMPOSE) exec $(FRONTEND) ./manage.py checkslides
+	@echo "$(GREEN)Slides check complete!$(NC)"
+
+getloadvalues: ## Get calculated load values of BBB nodes
+	@echo "$(GREEN)Getting load values...$(NC)"
+	$(COMPOSE) exec $(FRONTEND) ./manage.py getloadvalues
+
+gettenantsecrets: ## Get first secret and hostnames of tenants
+	@echo "$(GREEN)Getting tenant secrets...$(NC)"
+	$(COMPOSE) exec $(FRONTEND) ./manage.py gettenantsecrets
+
+listalltenantsecrets: ## List all secrets of all tenants
+	@echo "$(GREEN)Listing all tenant secrets...$(NC)"
+	$(COMPOSE) exec $(FRONTEND) ./manage.py listalltenantsecrets
+
+meetingstats: ## Get status information of tenants and meetings
+	@echo "$(GREEN)Getting meeting statistics...$(NC)"
+	$(COMPOSE) exec $(FRONTEND) ./manage.py meetingstats
+
 ##@ Utilities
 
 ps: status ## Alias for 'status'
