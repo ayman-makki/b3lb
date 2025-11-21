@@ -153,7 +153,7 @@ services:
       - B3LB_TASK_QUEUE_HOUSEKEEPING=${B3LB_TASK_QUEUE_HOUSEKEEPING:-b3lb}
       - B3LB_TASK_QUEUE_RECORD=${B3LB_TASK_QUEUE_RECORD:-b3lb-record}
       - B3LB_TASK_QUEUE_STATISTICS=${B3LB_TASK_QUEUE_STATISTICS:-b3lb}
-    command: uvicorn
+    command: ["loadbalancer", "runserver", "0.0.0.0:8000", "--force-color"]
     depends_on:
       postgres:
         condition: service_healthy

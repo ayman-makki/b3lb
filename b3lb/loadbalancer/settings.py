@@ -160,7 +160,7 @@ TIME_ZONE = env.str('TIME_ZONE', default='UTC')
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.1/howto/static-files/
 
-STATIC_URL = f'https://static.{B3LB_API_BASE_DOMAIN}/'
+STATIC_URL = "/static/" if B3LB_API_BASE_DOMAIN == "localhost" else f'https://static.{B3LB_API_BASE_DOMAIN}/'
 STATIC_ROOT = os.path.join(BASE_DIR, "static")
 
 
