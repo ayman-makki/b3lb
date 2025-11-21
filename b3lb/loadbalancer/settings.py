@@ -156,7 +156,6 @@ USE_TZ = True
 LANGUAGE_CODE = env.str('LANGUAGE_CODE', default='en-us')
 TIME_ZONE = env.str('TIME_ZONE', default='UTC')
 
-
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.1/howto/static-files/
 
@@ -223,6 +222,11 @@ LOGGING = {
             'propagate': True,
         },
         'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'celery-logger': {
             'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,

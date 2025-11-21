@@ -172,12 +172,14 @@ services:
   celery-beat:
     build:
       context: .
-      dockerfile: docker/Dockerfile
+      dockerfile: docker/Dockerfile.dev
     image: b3lb:${B3LB_VERSION:-local-dev}
     container_name: b3lb-celery-beat-local
     restart: unless-stopped
     networks:
       - b3lb-local
+    volumes:
+      - ./b3lb:/usr/src/app
     environment:
       - SECRET_KEY=${SECRET_KEY}
       - DEBUG=${DEBUG:-True}
@@ -191,7 +193,7 @@ services:
       - B3LB_TASK_QUEUE_HOUSEKEEPING=${B3LB_TASK_QUEUE_HOUSEKEEPING:-b3lb}
       - B3LB_TASK_QUEUE_RECORD=${B3LB_TASK_QUEUE_RECORD:-b3lb-record}
       - B3LB_TASK_QUEUE_STATISTICS=${B3LB_TASK_QUEUE_STATISTICS:-b3lb}
-    command: celery-beat
+    command: celery-beat-dev
     depends_on:
       postgres:
         condition: service_healthy
@@ -210,13 +212,14 @@ services:
   celery-worker:
     build:
       context: .
-      dockerfile: docker/Dockerfile
+      dockerfile: docker/Dockerfile.dev
     image: b3lb:${B3LB_VERSION:-local-dev}
     container_name: b3lb-celery-worker-local
     restart: unless-stopped
     networks:
       - b3lb-local
     volumes:
+      - ./b3lb:/usr/src/app
       - ./recordings:/recordings
     environment:
       - SECRET_KEY=${SECRET_KEY}
@@ -234,7 +237,7 @@ services:
       - B3LB_NODE_REQUEST_TIMEOUT=${B3LB_NODE_REQUEST_TIMEOUT:-10}
       - B3LB_RENDERING=${B3LB_RENDERING:-False}
       - HOSTNAME=celery-worker-local
-    command: celery-tasks
+    command: celery-worker-dev
     depends_on:
       postgres:
         condition: service_healthy

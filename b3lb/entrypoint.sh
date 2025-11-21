@@ -33,6 +33,12 @@ case "$CMD" in
     celery-tasks)
         exec celery -A loadbalancer worker -l info $@
         ;;
+    celery-worker-dev)
+        exec watchmedo auto-restart --directory=./ --pattern=*.py --recursive -- celery -A loadbalancer worker -l info -Q celery,b3lb,b3lb-record $@
+        ;;
+    celery-beat-dev)
+        exec celery -A loadbalancer beat -l info --pidfile=/tmp/celerybeat.pid --schedule=/tmp/celerybeat-schedule --scheduler django_celery_beat.schedulers:DatabaseScheduler
+        ;;
     loadbalancer)
         /usr/bin/env python3 ./manage.py migrate --no-input --force-color
         exec /usr/bin/env python3 ./manage.py $@

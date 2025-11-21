@@ -31,7 +31,7 @@ from rest.classes.checks import NodeCheck
 from rest.models import Meeting, Metric, Node, NodeMeetingList, Secret, SecretMeetingList
 from xml.etree import ElementTree
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("celery-logger")
 
 
 def check_node(check: NodeCheck):

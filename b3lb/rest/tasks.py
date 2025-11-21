@@ -26,7 +26,6 @@ import rest.task.b3lb as b3lbtask
 
 logger = get_task_logger(__name__)
 
-
 @app.task(ignore_result=True, base=Singleton, queue=st.B3LB_TASK_QUEUE_CORE)
 def update_secrets_lists():
     """
