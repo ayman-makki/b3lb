@@ -249,6 +249,38 @@ services:
     #   retries: 3
     #   start_period: 40s
 
+  #############################################################################
+  # Celery Flower - Task Monitor
+  #############################################################################
+  flower:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+    image: b3lb:${B3LB_VERSION:-local-dev}
+    container_name: b3lb-flower-local
+    restart: unless-stopped
+    networks:
+      - b3lb-local
+    ports:
+      - "5555:5555"
+    volumes:
+      - ./b3lb:/usr/src/app
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=${DEBUG:-True}
+      - B3LB_API_BASE_DOMAIN=${B3LB_API_BASE_DOMAIN:-localhost}
+      - DATABASE_URL=${DATABASE_URL:-postgres://b3lb_dev:dev_password_change_in_production@postgres:5432/b3lb_dev}
+      - CACHE_URL=${CACHE_URL:-redis://:dev_redis_password@redis:6379/1}
+      - CACHEOPS_REDIS=${CACHEOPS_REDIS:-redis://:dev_redis_password@redis:6379/2}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://:dev_redis_password@redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://:dev_redis_password@redis:6379/0}
+    command: celery-flower
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
 ###############################################################################
 # Optional: Recording Worker (only enable if testing recording features)
 ###############################################################################
