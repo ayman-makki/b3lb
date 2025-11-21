@@ -48,7 +48,7 @@ DEBUG = env.bool('DEBUG', default=False)
 
 SECRET_KEY = env.str('SECRET_KEY')
 
-ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["*"])
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["*"]) + ["frontend", "localhost"]
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[f"https://{B3LB_API_BASE_DOMAIN}"])
 
 DATABASES = {
