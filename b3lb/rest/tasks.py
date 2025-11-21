@@ -27,7 +27,7 @@ import rest.task.b3lb as b3lbtask
 logger = get_task_logger(__name__)
 
 
-@app.task(name="Update Secrets Lists", ignore_result=True, base=Singleton, queue=st.B3LB_TASK_QUEUE_CORE)
+@app.task(ignore_result=True, base=Singleton, queue=st.B3LB_TASK_QUEUE_CORE)
 def update_secrets_lists():
     """
     Async starting of secret list update tasks.
@@ -41,7 +41,7 @@ def update_secrets_lists():
     return f"Queue {counter} update list tasks."
 
 
-@app.task(name="Check Status of Nodes", ignore_result=True, base=Singleton, queue=st.B3LB_TASK_QUEUE_CORE)
+@app.task(ignore_result=True, base=Singleton, queue=st.B3LB_TASK_QUEUE_CORE)
 def check_status():
     """
     Async starting of node check tasks.
@@ -53,7 +53,7 @@ def check_status():
     return f"Queue {counter} update check tasks."
 
 
-@app.task(name="Update Statistics", ignore_result=True, base=Singleton, queue=st.B3LB_TASK_QUEUE_STATISTICS)
+@app.task(ignore_result=True, base=Singleton, queue=st.B3LB_TASK_QUEUE_STATISTICS)
 def update_statistic():
     """
     Async starting of tenant statistic update.
@@ -65,7 +65,7 @@ def update_statistic():
     return f"Queue {counter} update statistic tasks."
 
 
-@app.task(name="Render Records from RecordSets", ignore_result=True, base=Singleton, queue=st.B3LB_TASK_QUEUE_RECORD)
+@app.task(ignore_result=True, base=Singleton, queue=st.B3LB_TASK_QUEUE_RECORD)
 def render_record():
     """
     Async starting of rendering tasks.
@@ -77,6 +77,6 @@ def render_record():
     return f"Queue {counter} rendering tasks."
 
 
-@app.task(name="Housekeeping Recordings", ignore_result=True, base=Singleton, queue=st.B3LB_TASK_QUEUE_HOUSEKEEPING)
+@app.task(ignore_result=True, base=Singleton, queue=st.B3LB_TASK_QUEUE_HOUSEKEEPING)
 def housekeeping_recordings():
     return housekeeping_records()
