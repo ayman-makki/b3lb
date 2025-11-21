@@ -21,7 +21,7 @@ from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.template.loader import render_to_string
 from django.utils import timezone
-from celery.utils.log import get_task_logger
+import logging
 from json import dumps
 from requests import get
 from rest.b3lb.constants import RETURN_STRING_GET_MEETINGS_NO_MEETINGS
@@ -31,7 +31,7 @@ from rest.classes.checks import NodeCheck
 from rest.models import Meeting, Metric, Node, NodeMeetingList, Secret, SecretMeetingList
 from xml.etree import ElementTree
 
-logger = get_task_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def check_node(check: NodeCheck):
