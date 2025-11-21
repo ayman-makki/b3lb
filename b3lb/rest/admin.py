@@ -15,7 +15,24 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
-from django.contrib.admin import ModelAdmin, RelatedOnlyFieldListFilter, action, site
+from django.contrib.admin import RelatedOnlyFieldListFilter, action, site, register
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
+from django.contrib.auth.models import User, Group
+from unfold.admin import ModelAdmin
+from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
+from unfold.widgets import UnfoldAdminSelectWidget, UnfoldAdminTextInputWidget
+from django_celery_beat.models import (
+    ClockedSchedule,
+    CrontabSchedule,
+    IntervalSchedule,
+    PeriodicTask,
+    SolarSchedule,
+)
+from django_celery_beat.admin import ClockedScheduleAdmin as BaseClockedScheduleAdmin
+from django_celery_beat.admin import CrontabScheduleAdmin as BaseCrontabScheduleAdmin
+from django_celery_beat.admin import PeriodicTaskAdmin as BasePeriodicTaskAdmin
+from django_celery_beat.admin import PeriodicTaskForm, TaskSelectWidget
 from django.db.models import Q
 from django.utils.html import format_html
 from django.utils.http import urlencode
@@ -345,6 +362,67 @@ class TenantAdmin(ModelAdmin):
     def records_off(self, request, queryset):
         queryset.update(recording_enabled=False)
 
+
+
+# Unregister default User and Group admins
+site.unregister(User)
+site.unregister(Group)
+
+
+@register(User)
+class UserAdmin(BaseUserAdmin, ModelAdmin):
+    form = UserChangeForm
+    add_form = UserCreationForm
+    change_password_form = AdminPasswordChangeForm
+
+
+@register(Group)
+class GroupAdmin(BaseGroupAdmin, ModelAdmin):
+    pass
+
+
+# Unregister default Celery Beat admins
+site.unregister(PeriodicTask)
+site.unregister(IntervalSchedule)
+site.unregister(CrontabSchedule)
+site.unregister(SolarSchedule)
+site.unregister(ClockedSchedule)
+
+
+class UnfoldTaskSelectWidget(UnfoldAdminSelectWidget, TaskSelectWidget):
+    pass
+
+
+class UnfoldPeriodicTaskForm(PeriodicTaskForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["task"].widget = UnfoldAdminTextInputWidget()
+        self.fields["regtask"].widget = UnfoldTaskSelectWidget()
+
+
+@register(PeriodicTask)
+class PeriodicTaskAdmin(BasePeriodicTaskAdmin, ModelAdmin):
+    form = UnfoldPeriodicTaskForm
+
+
+@register(IntervalSchedule)
+class IntervalScheduleAdmin(ModelAdmin):
+    pass
+
+
+@register(CrontabSchedule)
+class CrontabScheduleAdmin(BaseCrontabScheduleAdmin, ModelAdmin):
+    pass
+
+
+@register(SolarSchedule)
+class SolarScheduleAdmin(ModelAdmin):
+    pass
+
+
+@register(ClockedSchedule)
+class ClockedScheduleAdmin(BaseClockedScheduleAdmin, ModelAdmin):
+    pass
 
 
 # register all models for admin view

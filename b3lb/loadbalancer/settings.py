@@ -31,6 +31,9 @@ import os
 import sys
 import email.utils
 import urllib.parse
+from django.templatetags.static import static
+from django.urls import reverse_lazy
+from django.utils.translation import gettext_lazy as _
 from loadbalancer.constants import *
 
 
@@ -58,6 +61,12 @@ CACHES = {
 # Application definition
 
 INSTALLED_APPS = [
+    "unfold",
+    "unfold.contrib.forms",
+    "unfold.contrib.filters",
+    "unfold.contrib.import_export",
+    "unfold.contrib.guardian",
+    "unfold.contrib.simple_history",
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -92,7 +101,7 @@ DEFAULT_FILE_STORAGE = 'db_file_storage.storage.DatabaseFileStorage'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, "templates")],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -231,5 +240,55 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+    },
+}
+
+
+UNFOLD = {
+    "SITE_TITLE": "B3LB Admin",
+    "SITE_HEADER": "B3LB",
+    "SITE_SUBHEADER": "BigBlueButton Load Balancer",
+    "DASHBOARD_CALLBACK": "rest.dashboard.dashboard_callback",
+    "COLORS": {
+        "primary": {
+            "50": "250 245 255",
+            "100": "243 232 255",
+            "200": "233 213 255",
+            "300": "216 180 254",
+            "400": "192 132 252",
+            "500": "168 85 247",
+            "600": "147 51 234",
+            "700": "126 34 206",
+            "800": "107 33 168",
+            "900": "88 28 135",
+            "950": "59 7 100",
+        },
+    },
+    "SIDEBAR": {
+        "show_search": True,
+        "show_all_applications": True,
+        # "navigation": [
+        #     {
+        #         "title": _("Navigation"),
+        #         "separator": True,
+        #         "items": [
+        #             {
+        #                 "title": _("Dashboard"),
+        #                 "icon": "dashboard",
+        #                 "link": reverse_lazy("admin:index"),
+        #             },
+        #             {
+        #                 "title": _("Users"),
+        #                 "icon": "people",
+        #                 "link": reverse_lazy("admin:auth_user_changelist"),
+        #             },
+        #             {
+        #                 "title": _("Groups"),
+        #                 "icon": "groups",
+        #                 "link": reverse_lazy("admin:auth_group_changelist"),
+        #             },
+        #         ],
+        #     },
+        # ],
     },
 }
