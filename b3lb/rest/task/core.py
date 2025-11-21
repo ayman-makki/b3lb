@@ -21,6 +21,7 @@ from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.template.loader import render_to_string
 from django.utils import timezone
+from celery.utils.log import get_task_logger
 from json import dumps
 from requests import get
 from rest.b3lb.constants import RETURN_STRING_GET_MEETINGS_NO_MEETINGS
@@ -30,8 +31,11 @@ from rest.classes.checks import NodeCheck
 from rest.models import Meeting, Metric, Node, NodeMeetingList, Secret, SecretMeetingList
 from xml.etree import ElementTree
 
+logger = get_task_logger(__name__)
+
 
 def check_node(check: NodeCheck):
+    logger.info(f"Checking node {check.node.slug} ({check.node.uuid})")
     try:
         response = get(check.node.load_base_url, timeout=settings.B3LB_NODE_REQUEST_TIMEOUT)
         if response.status_code == 200:
@@ -40,7 +44,8 @@ def check_node(check: NodeCheck):
                     node = Node.objects.select_for_update().get(uuid=check.node.uuid)
                     node.cpu_load = int(response.text.split('\n')[0])
                     node.save()
-    except:
+    except Exception as e:
+        logger.error(f"Error fetching CPU load for node {check.node.slug}: {e}")
         # Do nothing and keep last cpu load value
         pass
 
@@ -84,7 +89,8 @@ def check_node(check: NodeCheck):
                                             check.meeting_stats[meeting_id][cell.tag] = cell.text
                             check.attendees += attendee_dummy
             check.has_errors = False
-    except:
+    except Exception as e:
+        logger.error(f"Error fetching meetings for node {check.node.slug}: {e}")
         pass
 
     if check.has_errors:
@@ -158,7 +164,9 @@ def check_node(check: NodeCheck):
                         if name in Metric.GAUGES:
                             set_metric(name, secret, check.node, 0)
 
-    return dumps([check.node.slug, load, check.meetings, check.attendees])
+    result = dumps([check.node.slug, load, check.meetings, check.attendees])
+    logger.info(f"Check node {check.node.slug} result: {result}")
+    return result
 
 
 def generate_secret_get_meetings(secret: Secret):
