@@ -198,7 +198,7 @@ services:
       # Core Django settings
       - SECRET_KEY=${SECRET_KEY}
       - DEBUG=False
-      - ALLOWED_HOSTS=localhost,${B3LB_API_BASE_DOMAIN},*.${B3LB_API_BASE_DOMAIN}
+      - ALLOWED_HOSTS=localhost,${B3LB_API_BASE_DOMAIN},.${B3LB_API_BASE_DOMAIN}
       - LANGUAGE_CODE=en-us
       - TIME_ZONE=${TIME_ZONE:-Europe/Paris}
 
