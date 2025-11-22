@@ -60,7 +60,7 @@ services:
       - "80:80"
       - "443:443"
     environment:
-      - HETZNER_API_KEY=${HETZNER_DNS_API_TOKEN}
+      - HETZNER_API_TOKEN=${HETZNER_DNS_API_TOKEN}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik/traefik.yml:/traefik.yml:ro
