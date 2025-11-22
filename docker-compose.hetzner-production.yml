@@ -247,7 +247,7 @@ services:
     labels:
       - "traefik.enable=true"
       # API endpoints with wildcard
-      - "traefik.http.routers.b3lb-api.rule=Host(`${B3LB_API_BASE_DOMAIN}`) || HostRegexp(`^.+\.${B3LB_API_BASE_DOMAIN}$`)"
+      - "traefik.http.routers.b3lb-api.rule=Host(`${B3LB_API_BASE_DOMAIN}`) || HostRegexp(`^.+\\.${B3LB_API_BASE_DOMAIN}$`)"
       - "traefik.http.routers.b3lb-api.entrypoints=websecure"
       - "traefik.http.routers.b3lb-api.tls=true"
       - "traefik.http.routers.b3lb-api.tls.certresolver=hetzner"
