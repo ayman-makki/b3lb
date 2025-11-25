@@ -357,6 +357,7 @@ services:
     image: b3lb:${B3LB_VERSION:-latest}
     restart: unless-stopped
     networks:
+      - traefik
       - backend
     volumes:
       - /mnt/b3lb-recordings:/recordings
