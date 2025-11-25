@@ -106,7 +106,7 @@ for unit in b3lb-load.service b3lb-push.service b3lb-push.path b3lb-push.timer b
     if [ -f "/etc/systemd/system/$unit" ]; then
         rm -f "/etc/systemd/system/$unit"
         print_success "Removed"
-        ((ITEMS_REMOVED++))
+        ((ITEMS_REMOVED++)) || true
     else
         print_warning "Not found"
     fi
@@ -123,7 +123,7 @@ print_step "Removing b3lb-load script..."
 if [ -f /usr/local/lib/b3lb/b3lb-load ]; then
     rm -f /usr/local/lib/b3lb/b3lb-load
     print_success "Removed"
-    ((ITEMS_REMOVED++))
+    ((ITEMS_REMOVED++)) || true
 else
     print_warning "Not found"
 fi
@@ -132,7 +132,7 @@ print_step "Removing b3lb-push script..."
 if [ -f /usr/local/lib/b3lb/b3lb-push ]; then
     rm -f /usr/local/lib/b3lb/b3lb-push
     print_success "Removed"
-    ((ITEMS_REMOVED++))
+    ((ITEMS_REMOVED++)) || true
 else
     print_warning "Not found"
 fi
@@ -141,7 +141,7 @@ print_step "Removing b3lb-push-hook.rb..."
 if [ -f /usr/local/bigbluebutton/core/scripts/post_publish/b3lb-push-hook.rb ]; then
     rm -f /usr/local/bigbluebutton/core/scripts/post_publish/b3lb-push-hook.rb
     print_success "Removed"
-    ((ITEMS_REMOVED++))
+    ((ITEMS_REMOVED++)) || true
 else
     print_warning "Not found"
 fi
@@ -150,7 +150,7 @@ print_step "Removing cleaner.py..."
 if [ -f /opt/b3lb/scripts/cleaner.py ]; then
     rm -f /opt/b3lb/scripts/cleaner.py
     print_success "Removed"
-    ((ITEMS_REMOVED++))
+    ((ITEMS_REMOVED++)) || true
 else
     print_warning "Not found"
 fi
@@ -162,7 +162,7 @@ print_step "Removing b3lb-load.nginx..."
 if [ -f /etc/bigbluebutton/nginx/b3lb-load.nginx ]; then
     rm -f /etc/bigbluebutton/nginx/b3lb-load.nginx
     print_success "Removed"
-    ((ITEMS_REMOVED++))
+    ((ITEMS_REMOVED++)) || true
 else
     print_warning "Not found"
 fi
@@ -188,7 +188,7 @@ print_step "Removing push.properties..."
 if [ -f /etc/b3lb/push.properties ]; then
     rm -f /etc/b3lb/push.properties
     print_success "Removed"
-    ((ITEMS_REMOVED++))
+    ((ITEMS_REMOVED++)) || true
 else
     print_warning "Not found"
 fi
@@ -201,7 +201,7 @@ if [ -d /usr/local/lib/b3lb ]; then
     if [ -z "$(ls -A /usr/local/lib/b3lb)" ]; then
         rmdir /usr/local/lib/b3lb
         print_success "Removed (empty)"
-        ((ITEMS_REMOVED++))
+        ((ITEMS_REMOVED++)) || true
     else
         print_warning "Directory not empty, preserved"
     fi
@@ -214,7 +214,7 @@ if [ -d /etc/b3lb ]; then
     if [ -z "$(ls -A /etc/b3lb)" ]; then
         rmdir /etc/b3lb
         print_success "Removed (empty)"
-        ((ITEMS_REMOVED++))
+        ((ITEMS_REMOVED++)) || true
     else
         print_warning "Directory not empty, preserved"
     fi
@@ -227,7 +227,7 @@ if [ -d /opt/b3lb/scripts ]; then
     if [ -z "$(ls -A /opt/b3lb/scripts)" ]; then
         rmdir /opt/b3lb/scripts
         print_success "Removed (empty)"
-        ((ITEMS_REMOVED++))
+        ((ITEMS_REMOVED++)) || true
     else
         print_warning "Directory not empty, preserved"
     fi
@@ -240,7 +240,7 @@ if [ -d /opt/b3lb ]; then
     if [ -z "$(ls -A /opt/b3lb)" ]; then
         rmdir /opt/b3lb
         print_success "Removed (empty)"
-        ((ITEMS_REMOVED++))
+        ((ITEMS_REMOVED++)) || true
     else
         print_warning "Directory not empty, preserved"
     fi
@@ -252,7 +252,7 @@ print_step "Removing /run/b3lb..."
 if [ -d /run/b3lb ]; then
     rm -rf /run/b3lb
     print_success "Removed"
-    ((ITEMS_REMOVED++))
+    ((ITEMS_REMOVED++)) || true
 else
     print_warning "Not found"
 fi

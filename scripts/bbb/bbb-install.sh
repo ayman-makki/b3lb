@@ -5,13 +5,8 @@ set -e
 # CONFIGURATION
 # ============================================================================
 
-# Domain names (Change these before running)
-BBB_DOMAIN="bbb.example.com"
-B3LB_DOMAIN="b3lb.example.com"
-
 # Installation settings
 BBB_VERSION="jammy-300" # BBB 3.0 for Ubuntu 22.04
-EMAIL="admin@majlis.cam"
 REPO_URL="https://github.com/ayman-makki/b3lb.git"
 INSTALL_DIR="/root/b3lb" # Directory to clone the repo into
 
@@ -21,6 +16,52 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
+# ============================================================================
+# USAGE AND ARGUMENT PARSING
+# ============================================================================
+
+usage() {
+    echo "Usage: $0 --bbb-domain <domain> --b3lb-domain <domain> [--email <email>]"
+    echo ""
+    echo "Required:"
+    echo "  --bbb-domain    BigBlueButton server domain (e.g., bbb.example.com)"
+    echo "  --b3lb-domain   B3LB backend domain (e.g., b3lb.example.com)"
+    echo ""
+    echo "Optional:"
+    echo "  --email         Email for Let's Encrypt (default: admin@example.com)"
+    exit 1
+}
+
+# Default values
+BBB_DOMAIN=""
+B3LB_DOMAIN=""
+EMAIL="admin@example.com"
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --bbb-domain)
+            BBB_DOMAIN="$2"
+            shift 2
+            ;;
+        --b3lb-domain)
+            B3LB_DOMAIN="$2"
+            shift 2
+            ;;
+        --email)
+            EMAIL="$2"
+            shift 2
+            ;;
+        -h|--help)
+            usage
+            ;;
+        *)
+            echo "Unknown option: $1"
+            usage
+            ;;
+    esac
+done
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -52,6 +93,12 @@ print_error() {
 # Check if running as root
 if [[ $EUID -ne 0 ]]; then
    print_error "This script must be run as root"
+fi
+
+# Validate required arguments
+if [ -z "$BBB_DOMAIN" ] || [ -z "$B3LB_DOMAIN" ]; then
+    echo -e "${RED}✗${NC} Missing required arguments."
+    usage
 fi
 
 print_header "B3LB Node Installation Wrapper"
@@ -98,8 +145,18 @@ fi
 
 print_status "Server Public IP: $PUBLIC_IP"
 
-# Resolve Domain IP
-DOMAIN_IP=$(dig +short "$BBB_DOMAIN" | head -n 1)
+# Resolve Domain IP (with fallback methods)
+if command -v dig &> /dev/null; then
+    DOMAIN_IP=$(dig +short "$BBB_DOMAIN" | head -n 1)
+elif command -v host &> /dev/null; then
+    DOMAIN_IP=$(host "$BBB_DOMAIN" | awk '/has address/ { print $4; exit }')
+elif command -v getent &> /dev/null; then
+    DOMAIN_IP=$(getent hosts "$BBB_DOMAIN" | awk '{ print $1; exit }')
+else
+    print_status "Installing dnsutils for DNS resolution..."
+    apt-get install -y dnsutils
+    DOMAIN_IP=$(dig +short "$BBB_DOMAIN" | head -n 1)
+fi
 
 if [ -z "$DOMAIN_IP" ]; then
     print_error "Could not resolve domain $BBB_DOMAIN. Please ensure DNS A record is set."
@@ -124,14 +181,11 @@ if command -v bbb-conf &> /dev/null; then
 else
     print_status "Installing BigBlueButton $BBB_VERSION..."
     print_status "Command: wget -qO- https://raw.githubusercontent.com/bigbluebutton/bbb-install/v3.0.x-release/bbb-install.sh | bash -s -- -v $BBB_VERSION -s $BBB_DOMAIN -e $EMAIL -w"
-    
-    wget -qO- https://raw.githubusercontent.com/bigbluebutton/bbb-install/v3.0.x-release/bbb-install.sh | bash -s -- -v "$BBB_VERSION" -s "$BBB_DOMAIN" -e "$EMAIL" -w
-    
-    if [ $? -eq 0 ]; then
-        print_success "BigBlueButton installed successfully."
-    else
+
+    if ! wget -qO- https://raw.githubusercontent.com/bigbluebutton/bbb-install/v3.0.x-release/bbb-install.sh | bash -s -- -v "$BBB_VERSION" -s "$BBB_DOMAIN" -e "$EMAIL" -w; then
         print_error "BigBlueButton installation failed."
     fi
+    print_success "BigBlueButton installed successfully."
 fi
 
 # ----------------------------------------------------------------------------

@@ -56,7 +56,7 @@ echo "  4. Install b3lb-push (recording upload)"
 echo "  5. Install b3lb-cleaner (meeting cleanup)"
 echo ""
 echo -e "${YELLOW}Press Ctrl+C to cancel, or Enter to continue...${NC}"
-read
+read -r
 
 # Track installation progress
 STEPS_COMPLETED=0
@@ -76,7 +76,7 @@ run_script() {
     fi
 
     if bash "$script_path"; then
-        ((STEPS_COMPLETED++))
+        ((STEPS_COMPLETED++)) || true
         print_success "Step $STEPS_COMPLETED/$STEPS_TOTAL completed"
         return 0
     else
@@ -93,7 +93,7 @@ fi
 
 echo ""
 echo -e "${BLUE}Press Enter to continue with installation...${NC}"
-read
+read -r
 
 # Step 2: Install dependencies
 if ! run_script "01-install-dependencies.sh"; then
@@ -123,7 +123,7 @@ fi
 END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))
 MINUTES=$((DURATION / 60))
-SECONDS=$((DURATION % 60))
+ELAPSED_SECS=$((DURATION % 60))
 
 # Final summary
 clear
@@ -131,7 +131,7 @@ echo -e "${GREEN}╔════════════════════
 echo -e "${GREEN}║  Installation Complete!                 ║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════╝${NC}"
 echo ""
-echo -e "${BLUE}Installation Time:${NC} ${MINUTES}m ${SECONDS}s"
+echo -e "${BLUE}Installation Time:${NC} ${MINUTES}m ${ELAPSED_SECS}s"
 echo -e "${BLUE}Steps Completed:${NC} $STEPS_COMPLETED/$STEPS_TOTAL"
 echo ""
 

@@ -32,7 +32,7 @@ print_check() {
 
 print_pass() {
     echo -e "${GREEN}✓ PASS${NC}"
-    ((CHECKS_PASSED++))
+    ((CHECKS_PASSED++)) || true
 }
 
 print_fail() {
@@ -40,7 +40,7 @@ print_fail() {
     if [ -n "$1" ]; then
         echo -e "    ${RED}→ $1${NC}"
     fi
-    ((CHECKS_FAILED++))
+    ((CHECKS_FAILED++)) || true
 }
 
 print_warning() {
@@ -48,7 +48,7 @@ print_warning() {
     if [ -n "$1" ]; then
         echo -e "    ${YELLOW}→ $1${NC}"
     fi
-    ((CHECKS_WARNING++))
+    ((CHECKS_WARNING++)) || true
 }
 
 print_info() {
