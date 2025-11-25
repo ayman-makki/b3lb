@@ -1,0 +1,57 @@
+version: '3'
+
+services:
+  postgres:
+    image: postgres:14-alpine3.20
+    container_name: postgres
+    restart: unless-stopped
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=greenlight-v3-production
+
+  redis:
+    image: redis:6.2-alpine3.20
+    container_name: redis
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+
+  greenlight-v3:
+    entrypoint: [bin/start]
+    image: bigbluebutton/greenlight:v3
+    container_name: greenlight-v3
+    restart: unless-stopped
+    environment:
+      # Secret key for verifying integrity of secrets
+      - SECRET_KEY_BASE=${SERVICE_BASE64_128_GREENLIGHT}
+      
+      # BigBlueButton credentials
+      - BIGBLUEBUTTON_ENDPOINT=${BIGBLUEBUTTON_ENDPOINT:?}
+      - BIGBLUEBUTTON_SECRET=${BIGBLUEBUTTON_SECRET:?}
+      
+      # Database connection (using internal postgres service)
+      - DATABASE_URL=postgres://postgres:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/greenlight-v3-production
+      
+      # Redis connection (using internal redis service)
+      - REDIS_URL=redis://redis:6379
+      
+      # Coolify will generate a URL for this service
+      - SERVICE_FQDN_GREENLIGHT_3000
+    volumes:
+      - greenlight-storage:/usr/src/app/storage
+    depends_on:
+      - postgres
+      - redis
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  postgres-data:
+  redis-data:
+  greenlight-storage:
