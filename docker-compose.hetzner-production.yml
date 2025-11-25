@@ -373,7 +373,7 @@ services:
       - B3LB_TASK_QUEUE_STATISTICS=b3lb-stats
       - B3LB_NODE_PROTOCOL=https://
       - B3LB_NODE_REQUEST_TIMEOUT=5
-    command: celery-tasks
+    command: celery-tasks -Q b3lb-core,b3lb-housekeeping,b3lb-stats
     depends_on:
       postgres:
         condition: service_healthy
